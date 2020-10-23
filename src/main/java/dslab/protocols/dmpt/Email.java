@@ -1,6 +1,8 @@
 package dslab.protocols.dmpt;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Email {
 
@@ -67,8 +69,16 @@ public class Email {
 
     }
 
-    static public boolean isValidAddress(String address) {
-        return true; // todo
+    public static boolean isValidAddress(String address) {
+        // Check if recipient follows email pattern
+        Pattern pattern = Pattern.compile("^.+@.+\\..+$");
+        Matcher matcher = pattern.matcher(address);
+        return matcher.matches();
+    }
+
+    public static boolean isEmailValid(Email email) {
+        // todo check fields and recipients
+        return true;
     }
 
 }

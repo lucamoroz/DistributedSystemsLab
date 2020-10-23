@@ -8,25 +8,25 @@ dslab/TestInputStream.java
  dslab.TestInputStream
 dslab/StringMatches.java
  dslab.StringMatches
-dslab/transfer/TransferServerProtocolTest.java
- dslab.transfer.TransferServerProtocolTest
-dslab/mailbox/MailboxServerTest.java
- dslab.mailbox.MailboxServerTest
+dslab/NullOutputStream.java
+ dslab.NullOutputStream
+dslab/TestOutputStream.java
+ dslab.TestOutputStream
 dslab/Sockets.java
  dslab.Sockets
 dslab/JunitSocketClient.java
  dslab.JunitSocketClient
 dslab/TestBase.java
  dslab.TestBase
-dslab/TestOutputStream.java
- dslab.TestOutputStream
 dslab/monitoring/MonitoringServerTest.java
  dslab.monitoring.MonitoringServerTest
 dslab/mailbox/MailboxServerProtocolTest.java
  dslab.mailbox.MailboxServerProtocolTest
 dslab/transfer/TransferServerTest.java
  dslab.transfer.TransferServerTest
+dslab/transfer/TransferServerProtocolTest.java
+ dslab.transfer.TransferServerProtocolTest
 dslab/monitoring/MonitoringServerProtocolTest.java
  dslab.monitoring.MonitoringServerProtocolTest
-dslab/NullOutputStream.java
- dslab.NullOutputStream
+dslab/mailbox/MailboxServerTest.java
+ dslab.mailbox.MailboxServerTest

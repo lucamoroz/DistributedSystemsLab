@@ -42,7 +42,7 @@ public class TransferServer implements ITransferServer, Runnable {
         try {
 
             serverSocket = new ServerSocket(config.getInt("tcp.port"));
-            new ListenerThread(serverSocket).start();
+            new DMTPListenerThread(serverSocket).start();
 
         } catch (IOException e) {
             throw new UncheckedIOException("Error while creating server socket", e);
