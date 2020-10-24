@@ -2,12 +2,12 @@ package dslab.protocols.dmpt.client;
 
 import dslab.protocols.dmpt.DMTPException;
 import dslab.protocols.dmpt.Email;
-import dslab.protocols.dmpt.UnknownRecipientException;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.Arrays;
 
 public class DMTPClientHandler implements IDMTPClientHandler {
 
@@ -36,7 +36,7 @@ public class DMTPClientHandler implements IDMTPClientHandler {
     }
 
     @Override
-    public void sendEmail(Email email) throws DMTPException, UnknownRecipientException, IOException {
+    public void sendEmail(Email email, UnknownRecipientCallback callback) throws DMTPException, IOException {
 
         String message;
         String command;
@@ -46,12 +46,10 @@ public class DMTPClientHandler implements IDMTPClientHandler {
         message = reader.readLine();
         if (message == null) throw new DMTPException("protocol error");
         if (!message.equals("ok " + email.recipients.size())) {
+            // todo this should only contain username not domain
             if (message.startsWith("error unknown recipient ") && message.split(" ").length == 4) {
-                String unknownRecipient = message.split(" ")[3];
-                if (email.recipients.contains(unknownRecipient))
-                    throw new UnknownRecipientException(unknownRecipient);
-                else
-                    throw new DMTPException("protocol error");
+                String unknownRecipients = message.split(" ")[3];
+                callback.onUnknownRecipients(Arrays.asList(unknownRecipients.split(",")));
             } else {
                 throw new DMTPException("protocol error");
             }

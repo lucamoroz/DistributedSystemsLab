@@ -1,6 +1,7 @@
 package dslab.transfer;
 
 import dslab.protocols.dmpt.Email;
+import dslab.util.Config;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -17,6 +18,7 @@ public class DMTPListenerThread extends Thread {
     public static final int N_PRODUCERS = 2;
 
     private final ServerSocket serverSocket;
+    private final Config domainsConfig;
     private final ExecutorService producersExecutorService;
     private final ExecutorService consumersExecutorService;
     private final ArrayBlockingQueue<Email> blockingQueue;
@@ -27,6 +29,8 @@ public class DMTPListenerThread extends Thread {
         // Unlimited size thread pool vs limited size: this is an heuristic. Risk is thread starvation
         this.producersExecutorService = Executors.newFixedThreadPool(N_PRODUCERS);
         this.consumersExecutorService = Executors.newFixedThreadPool(N_CONSUMERS);
+
+        this.domainsConfig = new Config("domains");
 
         // Alternative is an unbounded LinkedBlockingQueue, but if producers produce more than consumers and the server
         // crashes, all the emails in the queue would be lost. This way, if capacity is reached, I can show an error
@@ -39,7 +43,7 @@ public class DMTPListenerThread extends Thread {
     public void run() {
 
         for (int i = 0; i < N_CONSUMERS; i++)
-            consumersExecutorService.submit(new EmailConsumer(blockingQueue));
+            consumersExecutorService.submit(new EmailConsumer(domainsConfig, blockingQueue));
 
         Socket socket = null;
 
@@ -52,7 +56,7 @@ public class DMTPListenerThread extends Thread {
                 producersExecutorService.submit(clientEmailProducer);
 
             } catch (SocketException e) {
-                System.out.println("SocketException while handling socket: " + e.getMessage());
+                // exit loop
                 break;
             } catch (IOException e) {
                 throw new UncheckedIOException(e);

@@ -7,7 +7,10 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
 
 public class DMTPServerHandler implements IDMTPServerHandler {
 
@@ -30,12 +33,11 @@ public class DMTPServerHandler implements IDMTPServerHandler {
         writer.println("ok DMTP");
         String message = reader.readLine();
 
-        if (message != null) {
-            if (message.equals("begin")) {
-                writer.println("ok");
-            } else {
-                throw new DMTPException("protocol error");
-            }
+        if (message != null && message.equals("begin")) {
+            writer.println("ok");
+        } else {
+            writer.println("error protocol error");
+            throw new DMTPException("protocol error");
         }
     }
 
@@ -46,85 +48,107 @@ public class DMTPServerHandler implements IDMTPServerHandler {
         // todo check reader.close() now
 
         while ((request = reader.readLine()) != null) {
-            // todo handle subject / data containing spaces..............................
             String[] tokens = request.split(" ");
 
             if (tokens.length == 0) {
+                writer.println("error protocol error");
                 throw new DMTPException("protocol error");
             }
 
-            if (tokens.length == 2) {
-                // if 2-words command
-                switch (tokens[0]) {
-                    case "to":
+            switch (tokens[0]) {
+                case "to":
 
-                        String[] recipients = tokens[1].split(",");
-                        // Reject recipients list if any of them is invalid
-                        for (String r : recipients) {
-                            if (!Email.isValidAddress(r)) {
-                                writer.println("error invalid address " + r);
-                                break;
-                            }
-                            if (!callback.validateRecipient(r)) {
-                                writer.println("error unknown recipient " + r);
-                                break;
-                            }
-                        }
-                        email.recipients = Arrays.asList(tokens[1].split(","));
-                        writer.println("ok " + email.recipients.size());
-                        break;
-
-                    case "from":
-
-                        if (Email.isValidAddress(tokens[1])) {
-                            email.sender = tokens[1];
-                            writer.println("ok");
-                        }
-                        else {
-                            writer.println("error invalid address " + tokens[1]);
-                        }
-
-                        break;
-
-                    case "subject":
-
-                        email.subject = tokens[1];
-                        writer.println("ok");
-                        break;
-
-                    case "data":
-
-                        email.data = tokens[1];
-                        writer.println("ok");
-                        break;
-                    default:
+                    if (tokens.length != 2) {
+                        writer.println("error protocol error");
                         throw new DMTPException("protocol error");
-                }
-            } else {
-                // if 1-word command
-                switch (tokens[0]) {
-                    case "send":
+                    }
 
-                        String missingParameter = findMissingParameter(email);
-                        if (missingParameter == null) {
-                            callback.consumeEmail(email);
+                    String[] recipients = tokens[1].split(",");
+                    // Validate and check unknown recipients
+                    List<String> unknownRecipients = new LinkedList<>();
+
+                    for (String r : recipients) {
+                        if (!Email.isValidAddress(r)) {
+                            writer.println("error invalid recipient");
+                            throw new DMTPException("invalid recipient");
+                        }
+                        if (!callback.validateRecipient(r)) {
+                            unknownRecipients.add(r);
+                        }
+                    }
+
+                    if (!unknownRecipients.isEmpty()) {
+                        writer.println("error unknown recipient " + String.join(",", unknownRecipients));
+                    } else {
+                        writer.println("ok " + recipients.length);
+                    }
+
+                    email.recipients = Arrays.asList(recipients);
+                    break;
+
+                case "from":
+
+                    if (tokens.length != 2) {
+                        writer.println("error protocol error");
+                        throw new DMTPException("protocol error");
+                    }
+
+                    if (Email.isValidAddress(tokens[1])) {
+                        email.sender = tokens[1];
+                        writer.println("ok");
+                    } else {
+                        writer.println("error invalid address " + tokens[1]);
+                    }
+                    break;
+
+                case "subject":
+
+                    // subject starts at index 8
+                    email.subject = request.substring(8);
+                    writer.println("ok");
+                    break;
+
+                case "data":
+
+                    // data starts at index 5
+                    email.data = request.substring(5);
+                    writer.println("ok");
+                    break;
+
+                case "send":
+
+                    if (!request.equals("send")) {
+                        writer.println("error protocol error");
+                        throw new DMTPException("protocol error");
+                    }
+
+                    String missingParameter = findMissingParameter(email);
+                    if (missingParameter == null) {
+                        if (callback.consumeEmail(email)) {
                             writer.println("ok");
                             // todo activate this.email = new Email();
-                        } else {
-                            writer.println("error no " + missingParameter);
+                        } else   {
+                            writer.println("error consuming email");
                         }
-                        break;
 
-                    case "quit":
+                    } else {
+                        writer.println("error no " + missingParameter);
+                    }
+                    break;
 
-                        writer.println("ok bye");
-                        return;
+                case "quit":
 
-                    default:
+                    if (!request.equals("quit")) {
+                        writer.println("error protocol error");
                         throw new DMTPException("protocol error");
-                }
-            }
+                    }
+                    writer.println("ok bye");
+                    return;
 
+                default:
+                    writer.println("error protocol error");
+                    throw new DMTPException("protocol error");
+            }
         }
 
         throw new DMTPException("Stream ended before completion.");

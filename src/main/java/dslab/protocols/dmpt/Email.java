@@ -3,6 +3,7 @@ package dslab.protocols.dmpt;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class Email {
 
@@ -34,6 +35,8 @@ public class Email {
                 List<String> prev = domainRecipients.getOrDefault(domain, new ArrayList<String>());
                 prev.add(recipient);
                 domainRecipients.put(domain, prev);
+            } else {
+                System.out.println("Invalid recipient found: " + recipient);
             }
         }
 
@@ -45,6 +48,13 @@ public class Email {
         return emails;
     }
 
+    public List<String> getRecipientsDomains() {
+        return recipients.stream()
+                .map(Email::getDomain)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
     @Override
     public String toString() {
         return "Email{" +
@@ -53,6 +63,13 @@ public class Email {
                 ", subject='" + subject + '\'' +
                 ", data='" + data + '\'' +
                 '}';
+    }
+
+    public String printToDmtpFormat() {
+        return "from " + sender + "\n" +
+                "to " + String.join(",", recipients) + "\n" +
+                "subject " + subject + "\n" +
+                "data " + data;
     }
 
     /**
@@ -66,19 +83,23 @@ public class Email {
         } else {
             return null;
         }
-
     }
+
+    static public String getUser(String address) {
+        if (isValidAddress(address)) {
+            return address.split("@")[0];
+        } else {
+            return null;
+        }
+    }
+
+
 
     public static boolean isValidAddress(String address) {
         // Check if recipient follows email pattern
         Pattern pattern = Pattern.compile("^.+@.+\\..+$");
         Matcher matcher = pattern.matcher(address);
         return matcher.matches();
-    }
-
-    public static boolean isEmailValid(Email email) {
-        // todo check fields and recipients
-        return true;
     }
 
 }

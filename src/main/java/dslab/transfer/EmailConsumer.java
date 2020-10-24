@@ -1,6 +1,5 @@
 package dslab.transfer;
 
-import dslab.protocols.dmpt.UnknownRecipientException;
 import dslab.protocols.dmpt.client.DMTPClientHandler;
 import dslab.protocols.dmpt.DMTPException;
 import dslab.protocols.dmpt.Email;
@@ -19,8 +18,10 @@ import java.util.stream.Collectors;
 public class EmailConsumer extends Thread {
 
     private final BlockingQueue<Email> blockingQueue;
+    private final Config domainsConfig;
 
-    public EmailConsumer(BlockingQueue<Email> blockingQueue) {
+    public EmailConsumer(Config domainsConfig, BlockingQueue<Email> blockingQueue) {
+        this.domainsConfig = domainsConfig;
         this.blockingQueue = blockingQueue;
     }
 
@@ -40,18 +41,21 @@ public class EmailConsumer extends Thread {
                 Set<String> failedRecipients = new HashSet<>();
                 // Stores any unknown recipients of any domain
                 Set<String> unknownRecipients = new HashSet<>();
-
                 // Stores any DMTP error encountered while processing the email
                 Set<String> encounteredProtocolErrors = new HashSet<>();
 
-                // Partition the email by recipients domain, domains will be processed sequentially
-                List<Email> sameDomainEmails = email.getEmailPerDomain();
+                List<String> domains = email.getRecipientsDomains();
 
-                for (Email e : sameDomainEmails) {
+                for (String domain : domains) {
 
                     // Try sending the email to all the recipients within a domain using one connection
                     try {
-                        String domain = getDomainFromEmail(e);
+
+                        if (!isDomainKnown(domain)) {
+                            System.out.println("Skipping unknown domain: " + domain);
+                            continue;
+                        }
+
                         socket = initSocketTo(domain);
                         reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                         writer = new PrintWriter(socket.getOutputStream(), true);
@@ -61,35 +65,56 @@ public class EmailConsumer extends Thread {
                         dmtpClientHandler.init();
 
                         // Try sending the email until no unknown recipients
-                        List<String> currDomainUnknownRecipients = trySendUntilKnownRecipients(dmtpClientHandler, e);
-                        if (!currDomainUnknownRecipients.isEmpty())
-                            unknownRecipients.addAll(currDomainUnknownRecipients);
+                        // List<String> currDomainUnknownRecipients = trySendUntilKnownRecipients(dmtpClientHandler, domain, email);
+                        dmtpClientHandler.sendEmail(email, unknownRecipients::addAll);
 
                         try {
                             dmtpClientHandler.close();
-                        } catch (IOException | DMTPException exception) {
+                        } catch (IOException | DMTPException e) {
                             // An error here can be ignored: all the important work has already been done
-                            System.out.println(exception.getMessage());
+                            System.out.println(e.getMessage());
                         }
 
 
-                    } catch (IOException exception) {
+                    } catch (IOException e) {
                         // In that case the error has been thrown during init() or sendEmail(), I assume that the email
-                        // wasn't sent to any recipient so he can handle the issue.
-                        failedRecipients.addAll(e.recipients);
-                    } catch (DMTPException error) {
+                        // wasn't sent to any recipient so the sender can handle the issue.
+                        List<String> failed = email.recipients.stream()
+                                .filter(r -> domain.equals(Email.getDomain(r)))
+                                .collect(Collectors.toList());
+                        failedRecipients.addAll(failed);
+                    } catch (DMTPException e) {
                         // Error from init() or sendEmail() methods, store the error and the list of recipients that
                         // didn't receive the email to create a report.
-                        encounteredProtocolErrors.add(error.getMessage());
-                        failedRecipients.addAll(e.recipients);
+                        encounteredProtocolErrors.add(e.getMessage());
+                        List<String> failed = email.recipients.stream()
+                                .filter(r -> domain.equals(Email.getDomain(r)))
+                                .collect(Collectors.toList());
+                        failedRecipients.addAll(failed);
                     } finally {
                         closeResources(socket, reader, writer);
                     }
 
-                    if (!failedRecipients.isEmpty() || !encounteredProtocolErrors.isEmpty()) {
-                        // todo send email to sender, but ask what to do in case of unknown recipients
+                }
+                // todo check and add error if unknown domain - add that to report
+                if (!unknownRecipients.isEmpty()) {
+                    // todo send email to sender, but ask what to do in case of unknown recipients
+                    Email errorEmail = new Email();
+                    errorEmail.sender = "noreply@transfer.com";
+                    errorEmail.recipients = List.of(email.sender);
+                    errorEmail.subject = "Error sending email";
+                    errorEmail.data = "error unknown recipient " + String.join(",", unknownRecipients);
+
+                    if (!encounteredProtocolErrors.isEmpty()) {
+                        errorEmail.data += "\n" + "Encountered errors: " + encounteredProtocolErrors.toString();
                     }
 
+                    if (!failedRecipients.isEmpty()) {
+                        errorEmail.data +=
+                                "\n" + "We encountered error while sending your email therefore we can't "
+                                + "guarantee that your email was sent to the following addresses: "
+                                + failedRecipients.toString();
+                    }
                 }
 
             } catch (InterruptedException e) {
@@ -99,8 +124,6 @@ public class EmailConsumer extends Thread {
                 Thread.currentThread().interrupt();
             }
         }
-
-        System.out.println("Terminated " + Thread.currentThread().getName());
     }
 
     private void closeResources(Socket socket, BufferedReader reader, PrintWriter writer) {
@@ -122,45 +145,14 @@ public class EmailConsumer extends Thread {
     }
 
     private Socket initSocketTo(String domain) throws IOException {
-        // todo - handle server down or not found
-        Config config = new Config("domains");
-        String addr = config.getString(domain);
+        String addr = domainsConfig.getString(domain);
         String ip = addr.split(":")[0];
         int port = Integer.parseInt(addr.split(":")[1]);
         return new Socket(ip, port);
     }
 
-    private static String getDomainFromEmail(Email email) {
-        return email.recipients.get(0).split("@")[1];
-    }
-
-    /**
-     *
-     * @param handler DMTP client protocol handler.
-     * @param email Email to send. Any unknown recipient found will be removed from the recipients.
-     * @return List of unknown recipients, empty if none.
-     */
-    private static List<String> trySendUntilKnownRecipients(IDMTPClientHandler handler, Email email)
-            throws DMTPException, IOException {
-        List<String> unknownRecipients = new LinkedList<>();
-        boolean retry = true;
-        while (retry) {
-
-            try {
-                handler.sendEmail(email);
-                retry = false;
-            } catch (UnknownRecipientException exception) {
-                unknownRecipients.add(exception.getUnknownRecipient());
-                email.recipients = email.recipients.stream()
-                        .filter(r -> !r.equals(exception.getUnknownRecipient()))
-                        .collect(Collectors.toList());
-            }
-
-            if (email.recipients.isEmpty())
-                retry = false;
-        }
-
-        return unknownRecipients;
+    private boolean isDomainKnown(String domain) {
+        return domainsConfig.containsKey(domain);
     }
 
 }
