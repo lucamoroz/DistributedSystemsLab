@@ -30,7 +30,7 @@ public class EmailConsumer extends Thread {
         Socket socket = null;
         BufferedReader reader = null;
         PrintWriter writer = null;
-        DMTPClientHandler dmtpClientHandler = null;
+        IDMTPClientHandler dmtpClientHandler = null;
 
         while (!Thread.currentThread().isInterrupted()) {
 
@@ -53,6 +53,10 @@ public class EmailConsumer extends Thread {
 
                         if (!isDomainKnown(domain)) {
                             System.out.println("Skipping unknown domain: " + domain);
+                            List<String> domainFailedRecipients = email.recipients.stream()
+                                    .filter(r -> domain.equals(Email.getDomain(r)))
+                                    .collect(Collectors.toList());
+                            failedRecipients.addAll(domainFailedRecipients);
                             continue;
                         }
 
@@ -61,11 +65,7 @@ public class EmailConsumer extends Thread {
                         writer = new PrintWriter(socket.getOutputStream(), true);
 
                         dmtpClientHandler = new DMTPClientHandler(socket, reader, writer);
-
                         dmtpClientHandler.init();
-
-                        // Try sending the email until no unknown recipients
-                        // List<String> currDomainUnknownRecipients = trySendUntilKnownRecipients(dmtpClientHandler, domain, email);
                         dmtpClientHandler.sendEmail(email, unknownRecipients::addAll);
 
                         try {
@@ -96,24 +96,43 @@ public class EmailConsumer extends Thread {
                     }
 
                 }
+
                 // todo check and add error if unknown domain - add that to report
-                if (!unknownRecipients.isEmpty()) {
-                    // todo send email to sender, but ask what to do in case of unknown recipients
-                    Email errorEmail = new Email();
-                    errorEmail.sender = "noreply@transfer.com";
-                    errorEmail.recipients = List.of(email.sender);
-                    errorEmail.subject = "Error sending email";
-                    errorEmail.data = "error unknown recipient " + String.join(",", unknownRecipients);
+                // (try) Send error email
+                if (!unknownRecipients.isEmpty() || !encounteredProtocolErrors.isEmpty() || !failedRecipients.isEmpty()) {
+                    Email errorEmail = getErrorEmail(email, unknownRecipients, encounteredProtocolErrors, failedRecipients);
 
-                    if (!encounteredProtocolErrors.isEmpty()) {
-                        errorEmail.data += "\n" + "Encountered errors: " + encounteredProtocolErrors.toString();
-                    }
+                    try {
+                        String domain = Email.getDomain(email.sender);
 
-                    if (!failedRecipients.isEmpty()) {
-                        errorEmail.data +=
-                                "\n" + "We encountered error while sending your email therefore we can't "
-                                + "guarantee that your email was sent to the following addresses: "
-                                + failedRecipients.toString();
+                        // ignore if sender unknown
+                        if (isDomainKnown(domain)) {
+                            System.out.println("Trying to send: " + errorEmail.toString());
+                            socket = initSocketTo(domain);
+                            reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                            writer = new PrintWriter(socket.getOutputStream(), true);
+
+                            dmtpClientHandler = new DMTPClientHandler(socket, reader, writer);
+                            System.out.println("init");
+                            dmtpClientHandler.init();
+                            System.out.println("sending");
+                            dmtpClientHandler.sendEmail(errorEmail, recipients -> {});
+
+                            try {
+                                dmtpClientHandler.close();
+                            } catch (IOException | DMTPException e) {
+                                // An error here can be ignored: all the important work has already been done
+                                System.out.println(e.getMessage());
+                            }
+                        } else {
+                            System.out.println("Skipping error email: unknown domain");
+                        }
+
+                    } catch (IOException | DMTPException e ) {
+                        // Ignore errors at this point
+                        System.out.println("Error sending error email: " + e.getMessage());
+                    } finally {
+                        closeResources(socket, reader, writer);
                     }
                 }
 
@@ -149,6 +168,34 @@ public class EmailConsumer extends Thread {
         String ip = addr.split(":")[0];
         int port = Integer.parseInt(addr.split(":")[1]);
         return new Socket(ip, port);
+    }
+
+    private static Email getErrorEmail(
+            Email email,
+            Set<String> unknownRecipients,
+            Set<String> encounteredProtocolErrors,
+            Set<String> failedRecipients
+    ) {
+        Email errorEmail = new Email();
+        errorEmail.sender = "noreply@transfer.com";
+        errorEmail.recipients = List.of(email.sender);
+        errorEmail.subject = "Error sending email";
+
+        if (!encounteredProtocolErrors.isEmpty() || !unknownRecipients.isEmpty()) {
+            errorEmail.data += "Encountered errors: ";
+            if (!unknownRecipients.isEmpty())
+                errorEmail.data += "error unknown recipient " + String.join(",", unknownRecipients);
+            for (String error : encounteredProtocolErrors)
+                errorEmail.data += " - " + error + " - ";
+        }
+
+        if (!failedRecipients.isEmpty()) {
+            errorEmail.data += " - We can't guarantee that your email was sent to the following addresses: ";
+            for (String rec : failedRecipients)
+                errorEmail.data += rec + " - ";
+        }
+
+        return errorEmail;
     }
 
     private boolean isDomainKnown(String domain) {

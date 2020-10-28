@@ -47,7 +47,7 @@ public class InMemoryEmailStorage implements IEmailStorage {
         for (String recipient : email.recipients) {
             if (this.domain.equals(Email.getDomain(recipient))) {
                 IUserEmails recipientStorage = getUserStorage(Email.getUser(recipient));
-                if (recipient != null) recipientStorage.addEmail(email);
+                if (recipientStorage != null) recipientStorage.addEmail(email);
             }
         }
     }

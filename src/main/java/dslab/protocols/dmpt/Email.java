@@ -21,33 +21,6 @@ public class Email {
     public String subject;
     public String data;
 
-    /**
-     * Returns a list of emails. The domain within a single email will be the same for all the recipients.
-     * @return List of Email, each Email will have one or more recipients that belong to the same domain.
-     */
-    public List<Email> getEmailPerDomain() {
-        List<Email> emails = new ArrayList<>();
-        HashMap<String, List<String>> domainRecipients = new HashMap<>();
-
-        for (String recipient : recipients) {
-            String domain = getDomain(recipient);
-            if (domain != null) {
-                List<String> prev = domainRecipients.getOrDefault(domain, new ArrayList<String>());
-                prev.add(recipient);
-                domainRecipients.put(domain, prev);
-            } else {
-                System.out.println("Invalid recipient found: " + recipient);
-            }
-        }
-
-        for (List<String> sameDomainRecipients : domainRecipients.values()) {
-            Email email = new Email(sender, sameDomainRecipients, subject, data);
-            emails.add(email);
-        }
-
-        return emails;
-    }
-
     public List<String> getRecipientsDomains() {
         return recipients.stream()
                 .map(Email::getDomain)

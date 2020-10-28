@@ -47,7 +47,8 @@ public class DMTPClientHandler implements IDMTPClientHandler {
         if (message == null) throw new DMTPException("protocol error");
         if (!message.equals("ok " + email.recipients.size())) {
             // todo this should only contain username not domain
-            if (message.startsWith("error unknown recipient ") && message.split(" ").length == 4) {
+            // Check if unknown recipients with content (i.e. length >24)
+            if (message.startsWith("error unknown recipient ") && message.length() > 24) {
                 String unknownRecipients = message.split(" ")[3];
                 callback.onUnknownRecipients(Arrays.asList(unknownRecipients.split(",")));
             } else {
@@ -61,7 +62,7 @@ public class DMTPClientHandler implements IDMTPClientHandler {
         command = "subject " + email.subject;
         executeOrThrowException(command, "ok", reader, writer);
 
-        command = "data " + email.subject;
+        command = "data " + email.data;
         executeOrThrowException(command, "ok", reader, writer);
 
         command = "send";
