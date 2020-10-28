@@ -36,8 +36,6 @@ public class TransferServer implements ITransferServer, Runnable {
 
     @Override
     public void run() {
-        // TODO
-
         // Spawn a thread to accept incoming requests
         try {
 

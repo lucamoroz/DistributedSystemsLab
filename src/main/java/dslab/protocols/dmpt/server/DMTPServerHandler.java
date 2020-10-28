@@ -44,8 +44,6 @@ public class DMTPServerHandler implements IDMTPServerHandler {
     public void receiveEmails(Callback callback) throws DMTPException, IOException {
         String request;
 
-        // todo check reader.close() now
-
         while ((request = reader.readLine()) != null) {
             String[] tokens = request.split(" ");
 
@@ -125,7 +123,7 @@ public class DMTPServerHandler implements IDMTPServerHandler {
                     if (missingParameter == null) {
                         if (callback.consumeEmail(email)) {
                             writer.println("ok");
-                            // todo activate this.email = new Email();
+                            this.email = new Email();
                         } else   {
                             writer.println("error consuming email");
                         }
