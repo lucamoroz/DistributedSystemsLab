@@ -11,6 +11,10 @@ import java.util.Arrays;
 
 public class DMTPClientHandler implements IDMTPClientHandler {
 
+    private static final String UNEXPECTED_ANSWER = "protocol error unexpected answer";
+    private static final String NO_ANSWER = "protocol error no answer";
+
+
     Socket socket;
     BufferedReader reader;
     PrintWriter writer;
@@ -28,8 +32,10 @@ public class DMTPClientHandler implements IDMTPClientHandler {
         String command;
 
         message = reader.readLine();
-        if (message == null || !message.equals("ok DMTP"))
-            throw new DMTPException("protocol error");
+        if (message == null)
+            throw new DMTPException(NO_ANSWER);
+        if (!message.equals("ok DMTP"))
+            throw new DMTPException(UNEXPECTED_ANSWER);
 
         command = "begin";
         executeOrThrowException(command, "ok", reader, writer);
@@ -44,7 +50,7 @@ public class DMTPClientHandler implements IDMTPClientHandler {
         command = "to " + String.join(",", email.recipients);
         writer.println(command);
         message = reader.readLine();
-        if (message == null) throw new DMTPException("protocol error");
+        if (message == null) throw new DMTPException(NO_ANSWER);
         if (!message.equals("ok " + email.recipients.size())) {
             // todo this should only contain username not domain
             // Check if unknown recipients with content (i.e. length >24)
@@ -52,7 +58,7 @@ public class DMTPClientHandler implements IDMTPClientHandler {
                 String unknownRecipients = message.split(" ")[3];
                 callback.onUnknownRecipients(Arrays.asList(unknownRecipients.split(",")));
             } else {
-                throw new DMTPException("protocol error");
+                throw new DMTPException(UNEXPECTED_ANSWER);
             }
         }
 
@@ -85,13 +91,13 @@ public class DMTPClientHandler implements IDMTPClientHandler {
 
         writer.println(command);
         String message = reader.readLine();
-        if (message == null) throw new DMTPException("protocol error");
+        if (message == null) throw new DMTPException(NO_ANSWER);
         if (!message.equals(expectedAnswer)) {
             if (message.startsWith("error ")) {
                 // Insert error message as content
                 throw new DMTPException(message.substring(6));
             } else {
-                throw new DMTPException("protocol error");
+                throw new DMTPException(UNEXPECTED_ANSWER);
             }
         }
     }
