@@ -52,7 +52,6 @@ public class DMTPClientHandler implements IDMTPClientHandler {
         message = reader.readLine();
         if (message == null) throw new DMTPException(NO_ANSWER);
         if (!message.equals("ok " + email.recipients.size())) {
-            // todo this should only contain username not domain
             // Check if unknown recipients with content (i.e. length >24)
             if (message.startsWith("error unknown recipient ") && message.length() > 24) {
                 String unknownRecipients = message.split(" ")[3];

@@ -50,7 +50,8 @@ public class ListenerThread extends Thread {
             }
 
         } catch (SocketException e) {
-            System.out.println("SocketException while waiting for/handling packets: " + e.getMessage());
+            if (!Thread.currentThread().isInterrupted())
+                System.out.println("SocketException while waiting for/handling packets: " + e.getMessage());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         } finally {
