@@ -10,7 +10,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.Socket;
+import java.net.*;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.stream.Collectors;
@@ -44,6 +44,8 @@ public class EmailConsumer extends Thread {
 
                 List<String> domains = email.getRecipientsDomains();
 
+
+
                 for (String domain : domains) {
 
                     // Try sending the email to all the recipients within a domain using one connection
@@ -55,7 +57,10 @@ public class EmailConsumer extends Thread {
                             continue;
                         }
 
+                        // If connection refused (e.g. email server down) the sender will be notified that the users
+                        // of this domain didn't receive the email.
                         socket = initSocketTo(domain);
+
                         reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                         writer = new PrintWriter(socket.getOutputStream(), true);
 
@@ -73,10 +78,10 @@ public class EmailConsumer extends Thread {
                             System.out.println(e.getMessage());
                         }
 
-
                     } catch (IOException e) {
                         // In that case the error has been thrown during init() or sendEmail(), I assume that the email
                         // wasn't sent to any recipient so the sender can handle the issue.
+                        System.out.println("IOException when consuming email for domain " + domain + ": " + e.getMessage());
                         List<String> failed = email.recipients.stream()
                                 .filter(r -> domain.equals(Email.getDomain(r)))
                                 .collect(Collectors.toList());
@@ -84,6 +89,7 @@ public class EmailConsumer extends Thread {
                     } catch (DMTPException e) {
                         // Error from init() or sendEmail() methods, store the error and the list of recipients that
                         // didn't receive the email to create a report.
+                        System.out.println("DMTP Exception consuming email: " + e.getMessage());
                         encounteredProtocolErrors.add(e.getMessage());
                         List<String> failed = email.recipients.stream()
                                 .filter(r -> domain.equals(Email.getDomain(r)))
@@ -129,6 +135,7 @@ public class EmailConsumer extends Thread {
                         closeResources(socket, reader, writer);
                     }
                 }
+
 
             } catch (InterruptedException e) {
                 // In case of interruption, email will be lost.

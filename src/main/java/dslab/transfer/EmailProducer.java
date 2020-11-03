@@ -4,11 +4,15 @@ import dslab.protocols.dmpt.DMTPException;
 import dslab.protocols.dmpt.server.DMTPServerHandler;
 import dslab.protocols.dmpt.Email;
 import dslab.protocols.dmpt.server.IDMTPServerHandler;
+import dslab.util.Config;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.util.concurrent.BlockingQueue;
 
@@ -16,10 +20,12 @@ public class EmailProducer implements Runnable {
 
     private final Socket socket;
     private final BlockingQueue<Email> blockingQueue;
+    private final Config transferConfig;
 
-    public EmailProducer(Socket socket, BlockingQueue<Email> blockingQueue) {
+    public EmailProducer(Config transferConfig, Socket socket, BlockingQueue<Email> blockingQueue) {
         this.socket = socket;
         this.blockingQueue = blockingQueue;
+        this.transferConfig = transferConfig;
     }
 
     @Override
@@ -50,6 +56,7 @@ public class EmailProducer implements Runnable {
                         return false;
                     }
 
+                    sendLogMessage(socket.getLocalAddress(), socket.getLocalPort(), email);
                     return true;
                 }
 
@@ -62,9 +69,9 @@ public class EmailProducer implements Runnable {
 
 
         } catch (DMTPException e) {
-            System.out.println("DMTP error: " + e.getMessage());
+            // Ignore dmtp exceptions caused by clients (users)
         } catch (IOException e) {
-            System.out.println("IOException: " + e.getMessage());
+            System.out.println("IOException receiving email from client: " + e.getMessage());
         }
         finally {
             closeResources(socket, reader, writer);
@@ -86,6 +93,22 @@ public class EmailProducer implements Runnable {
             try {
                 socket.close();
             } catch (IOException exception) { }
+        }
+    }
+
+    private void sendLogMessage(InetAddress localAddress, int port, Email email) {
+        try {
+            DatagramSocket socket = new DatagramSocket();
+            String log = localAddress.getHostAddress() + ":" + port + " " + email.sender;
+
+            DatagramPacket packet = new DatagramPacket(log.getBytes(), log.getBytes().length,
+                    InetAddress.getByName(transferConfig.getString("monitoring.host")),
+                    transferConfig.getInt("monitoring.port"));
+
+            socket.send(packet);
+
+        } catch (IOException e) {
+            System.out.println("Couldn't send log message: " + e.getMessage());
         }
     }
 

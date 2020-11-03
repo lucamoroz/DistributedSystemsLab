@@ -38,9 +38,8 @@ public class TransferServer implements ITransferServer, Runnable {
     public void run() {
         // Spawn a thread to accept incoming requests
         try {
-
             serverSocket = new ServerSocket(config.getInt("tcp.port"));
-            new DMTPListenerThread(serverSocket).start();
+            new DMTPListenerThread(serverSocket, config).start();
 
         } catch (IOException e) {
             throw new UncheckedIOException("Error while creating server socket", e);

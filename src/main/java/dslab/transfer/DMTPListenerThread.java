@@ -19,11 +19,12 @@ public class DMTPListenerThread extends Thread {
 
     private final ServerSocket serverSocket;
     private final Config domainsConfig;
+    private final Config transferConfig;
     private final ExecutorService producersExecutorService;
     private final ExecutorService consumersExecutorService;
     private final ArrayBlockingQueue<Email> blockingQueue;
 
-    public DMTPListenerThread(ServerSocket serverSocket) {
+    public DMTPListenerThread(ServerSocket serverSocket, Config config) {
         this.serverSocket = serverSocket;
 
         // Unlimited size thread pool vs limited size: this is an heuristic. Risk is thread starvation
@@ -31,6 +32,7 @@ public class DMTPListenerThread extends Thread {
         this.consumersExecutorService = Executors.newFixedThreadPool(N_CONSUMERS);
 
         this.domainsConfig = new Config("domains");
+        this.transferConfig = config;
 
         // Alternative is an unbounded LinkedBlockingQueue, but if producers produce more than consumers and the server
         // crashes, all the emails in the queue would be lost. This way, if capacity is reached, I can show an error
@@ -42,6 +44,7 @@ public class DMTPListenerThread extends Thread {
     @Override
     public void run() {
 
+        // todo if the executor is full of requests, maybe it's better to reject more requests
         for (int i = 0; i < N_CONSUMERS; i++)
             consumersExecutorService.submit(new EmailConsumer(domainsConfig, blockingQueue));
 
@@ -52,7 +55,7 @@ public class DMTPListenerThread extends Thread {
             try {
                 socket = serverSocket.accept();
 
-                Runnable clientEmailProducer = new EmailProducer(socket, blockingQueue);
+                Runnable clientEmailProducer = new EmailProducer(transferConfig, socket, blockingQueue);
                 producersExecutorService.submit(clientEmailProducer);
 
             } catch (SocketException e) {
