@@ -44,7 +44,6 @@ public class DMTPListenerThread extends Thread {
     @Override
     public void run() {
 
-        // todo if the executor is full of requests, maybe it's better to reject more requests
         for (int i = 0; i < N_CONSUMERS; i++)
             consumersExecutorService.submit(new EmailConsumer(domainsConfig, blockingQueue));
 

@@ -10,6 +10,8 @@ import java.net.Socket;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class DMTPServerHandler implements IDMTPServerHandler {
 
@@ -75,7 +77,12 @@ public class DMTPServerHandler implements IDMTPServerHandler {
                     }
 
                     if (!unknownRecipients.isEmpty()) {
-                        writer.println("error unknown recipient " + String.join(",", unknownRecipients));
+                        // Report unknown recipients removing domain
+                        List<String> unknownRecNoDomain = unknownRecipients.stream()
+                                .map(Email::getUser)
+                                .filter(user -> !Objects.isNull(user))
+                                .collect(Collectors.toList());
+                        writer.println("error unknown recipient " + String.join(",", unknownRecNoDomain));
                     } else {
                         writer.println("ok " + recipients.length);
                     }

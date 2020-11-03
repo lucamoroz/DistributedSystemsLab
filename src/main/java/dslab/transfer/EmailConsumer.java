@@ -67,8 +67,11 @@ public class EmailConsumer extends Thread {
                         dmtpClientHandler = new DMTPClientHandler(socket, reader, writer);
                         dmtpClientHandler.init();
 
-                        dmtpClientHandler.sendEmail(email, recipients ->
-                                encounteredProtocolErrors.add("error unknown recipient " + String.join(",", recipients))
+                        dmtpClientHandler.sendEmail(email, recipients -> {
+                                    recipients = recipients.stream()
+                                            .map(recipient -> recipient + "@" + domain).collect(Collectors.toList());
+                                    encounteredProtocolErrors.add("error unknown recipient " + String.join(",", recipients));
+                                }
                         );
 
                         try {
