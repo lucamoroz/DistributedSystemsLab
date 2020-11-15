@@ -1,6 +1,6 @@
 package dslab.protocols.dmap;
 
-import dslab.protocols.dmpt.Email;
+import dslab.protocols.dmtp.Email;
 
 import java.io.BufferedReader;
 import java.io.IOException;

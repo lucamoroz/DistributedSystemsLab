@@ -2,10 +2,10 @@ package dslab.mailbox;
 
 import dslab.mailbox.storage.IEmailStorage;
 import dslab.mailbox.storage.InMemoryEmailStorage;
-import dslab.protocols.dmpt.DMTPException;
-import dslab.protocols.dmpt.Email;
-import dslab.protocols.dmpt.server.DMTPServerHandler;
-import dslab.protocols.dmpt.server.IDMTPServerHandler;
+import dslab.protocols.dmtp.DMTPException;
+import dslab.protocols.dmtp.Email;
+import dslab.protocols.dmtp.server.DMTPServerHandler;
+import dslab.protocols.dmtp.server.IDMTPServerHandler;
 import dslab.util.Config;
 
 import java.io.BufferedReader;

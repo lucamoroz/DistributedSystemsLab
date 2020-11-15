@@ -1,9 +1,9 @@
 package dslab.transfer;
 
-import dslab.protocols.dmpt.client.DMTPClientHandler;
-import dslab.protocols.dmpt.DMTPException;
-import dslab.protocols.dmpt.Email;
-import dslab.protocols.dmpt.client.IDMTPClientHandler;
+import dslab.protocols.dmtp.client.DMTPClientHandler;
+import dslab.protocols.dmtp.DMTPException;
+import dslab.protocols.dmtp.Email;
+import dslab.protocols.dmtp.client.IDMTPClientHandler;
 import dslab.util.Config;
 
 import java.io.BufferedReader;

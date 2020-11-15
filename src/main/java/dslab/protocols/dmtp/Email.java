@@ -1,4 +1,4 @@
-package dslab.protocols.dmpt;
+package dslab.protocols.dmtp;
 
 import java.util.*;
 import java.util.regex.Matcher;

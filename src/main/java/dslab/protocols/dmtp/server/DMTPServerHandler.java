@@ -1,7 +1,7 @@
-package dslab.protocols.dmpt.server;
+package dslab.protocols.dmtp.server;
 
-import dslab.protocols.dmpt.DMTPException;
-import dslab.protocols.dmpt.Email;
+import dslab.protocols.dmtp.DMTPException;
+import dslab.protocols.dmtp.Email;
 
 import java.io.BufferedReader;
 import java.io.IOException;

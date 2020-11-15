@@ -1,4 +1,4 @@
-package dslab.protocols.dmpt;
+package dslab.protocols.dmtp;
 
 /**
  * Fatal protocol error.

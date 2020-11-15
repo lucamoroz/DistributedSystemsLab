@@ -1,6 +1,6 @@
 package dslab.mailbox.storage;
 
-import dslab.protocols.dmpt.Email;
+import dslab.protocols.dmtp.Email;
 
 import java.util.Collections;
 import java.util.Set;

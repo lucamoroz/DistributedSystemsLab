@@ -6,7 +6,7 @@ import dslab.mailbox.storage.InMemoryEmailStorage;
 import dslab.protocols.dmap.DMAPException;
 import dslab.protocols.dmap.DMAPServerHandler;
 import dslab.protocols.dmap.IDMAPServerHandler;
-import dslab.protocols.dmpt.Email;
+import dslab.protocols.dmtp.Email;
 import dslab.util.Config;
 
 import java.io.BufferedReader;

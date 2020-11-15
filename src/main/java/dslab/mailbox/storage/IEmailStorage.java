@@ -1,6 +1,6 @@
 package dslab.mailbox.storage;
 
-import dslab.protocols.dmpt.Email;
+import dslab.protocols.dmtp.Email;
 
 public interface IEmailStorage {
     IUserEmails getUserStorage(String user);
