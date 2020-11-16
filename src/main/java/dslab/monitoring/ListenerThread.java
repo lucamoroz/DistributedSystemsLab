@@ -37,9 +37,13 @@ public class ListenerThread extends Thread {
 
                 String message = new String(packet.getData());
 
-                if (!isLogValid(message)) continue;
-
-                LogMessage log = parseLogMessage(message);
+                LogMessage log = null;
+                try {
+                    log = parseLogMessage(message);
+                } catch (Exception e) {
+                    System.out.println("Failed parsing: " + message + " for reason: " + e.getMessage());
+                    continue;
+                }
 
                 Integer prev = nEmailsPerAddress.getOrDefault(log.emailAddress, 0);
                 nEmailsPerAddress.put(log.emailAddress, prev + 1);
@@ -62,38 +66,17 @@ public class ListenerThread extends Thread {
     }
 
     /**
-     * @param message candidate log message
-     * @return true if the message follows the pattern <host>:<port> <email-address>
-     */
-    private boolean isLogValid(String message) {
-        String[] tokens = message.split(" ");
-
-        if (tokens.length != 2) return false;
-
-        if (!Email.isValidAddress(tokens[1])) return false;
-
-        String[] hostPort = tokens[0].split(":");
-        if (hostPort.length != 2) return false;
-
-        try {
-            Integer.parseInt(hostPort[1]);
-        } catch (NumberFormatException e) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
      * @param message String log message following the pattern <host>:<port> <email-address>
      * @return LogMessage
      */
     private LogMessage parseLogMessage(String message) {
+
         String[] addrEmail = message.split(" ");
+        String address = addrEmail[0];
         String email = addrEmail[1];
-        String[] hostPort = addrEmail[0].split(":");
-        String host = hostPort[0];
-        int port = Integer.parseInt(hostPort[1]);
+
+        String host = address.substring(0, address.lastIndexOf(":"));
+        int port = Integer.parseInt(address.substring(address.lastIndexOf(":") + 1));
 
         return new LogMessage(host, port, email);
     }
