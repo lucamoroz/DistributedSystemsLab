@@ -117,20 +117,20 @@ public class Nameserver implements INameserver {
     @Override
     @Command
     public void shutdown() {
+        // Unbind remote object and shutdown registry if this is the root nameserver
+        if (!config.containsKey("domain")) {
+            try {
+                registry.unbind(config.getString("root_id"));
+                UnicastRemoteObject.unexportObject(registry, true);
+            } catch (Exception e) {
+                System.err.println("Error while unbinding object: " + e.getMessage());
+            }
+        }
+
         try {
             UnicastRemoteObject.unexportObject(managedNameserverRemote, true);
         } catch (NoSuchObjectException e) {
             System.err.println("Error while unexporting object: " + e.getMessage());
-        }
-
-        // Unbind remote object if this is the root nameserver
-        if (!config.containsKey("domain")) {
-            try {
-                // unbind the remote object so that a client can't find it anymore
-                registry.unbind(config.getString("root_id"));
-            } catch (Exception e) {
-                System.err.println("Error while unbinding object: " + e.getMessage());
-            }
         }
 
         shell.out().println("Bye bye");
