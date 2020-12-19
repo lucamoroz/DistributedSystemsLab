@@ -1,8 +1,8 @@
 package dslab.transfer;
 
 import dslab.protocols.dmtp.DMTPException;
-import dslab.protocols.dmtp.server.DMTPServerHandler;
 import dslab.protocols.dmtp.Email;
+import dslab.protocols.dmtp.server.DMTPServerHandler;
 import dslab.protocols.dmtp.server.IDMTPServerHandler;
 import dslab.util.Config;
 

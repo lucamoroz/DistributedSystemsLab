@@ -1,7 +1,5 @@
 package dslab.monitoring;
 
-import dslab.protocols.dmtp.Email;
-
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.DatagramPacket;

@@ -1,8 +1,8 @@
 package dslab.transfer;
 
-import dslab.protocols.dmtp.client.DMTPClientHandler;
 import dslab.protocols.dmtp.DMTPException;
 import dslab.protocols.dmtp.Email;
+import dslab.protocols.dmtp.client.DMTPClientHandler;
 import dslab.protocols.dmtp.client.IDMTPClientHandler;
 import dslab.util.Config;
 
@@ -10,8 +10,10 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.*;
-import java.util.*;
+import java.net.Socket;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.stream.Collectors;
 
