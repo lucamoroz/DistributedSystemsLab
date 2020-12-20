@@ -1,5 +1,6 @@
 package dslab.transfer;
 
+import dslab.nameserver.INameserverRemote;
 import dslab.protocols.dmtp.DMTPException;
 import dslab.protocols.dmtp.Email;
 import dslab.protocols.dmtp.client.DMTPClientHandler;
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.rmi.RemoteException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -20,10 +22,10 @@ import java.util.stream.Collectors;
 public class EmailConsumer extends Thread {
 
     private final BlockingQueue<Email> blockingQueue;
-    private final Config domainsConfig;
+    private final INameserverRemote rootNameserver;
 
-    public EmailConsumer(Config domainsConfig, BlockingQueue<Email> blockingQueue) {
-        this.domainsConfig = domainsConfig;
+    public EmailConsumer(INameserverRemote rootNameserver, BlockingQueue<Email> blockingQueue) {
+        this.rootNameserver = rootNameserver;
         this.blockingQueue = blockingQueue;
     }
 
@@ -53,15 +55,10 @@ public class EmailConsumer extends Thread {
                     // Try sending the email to all the recipients within a domain using one connection
                     try {
 
-                        if (!isDomainKnown(domain)) {
-                            System.out.println("Skipping unknown domain: " + domain);
-                            encounteredProtocolErrors.add("error unknown domain " + domain);
-                            continue;
-                        }
-
                         // If connection refused (e.g. email server down) the sender will be notified that the users
                         // of this domain didn't receive the email.
                         socket = initSocketTo(domain);
+
 
                         reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                         writer = new PrintWriter(socket.getOutputStream(), true);
@@ -83,6 +80,9 @@ public class EmailConsumer extends Thread {
                             System.out.println(e.getMessage());
                         }
 
+                    } catch (DomainNotFoundException e) {
+                        System.out.println("Skipping unknown domain " + domain + ": " + e.getMessage());
+                        encounteredProtocolErrors.add("error unknown domain " + domain);
                     } catch (IOException e) {
                         // In that case the error has been thrown during init() or sendEmail(), I assume that the email
                         // wasn't sent to any recipient so the sender can handle the issue.
@@ -113,26 +113,23 @@ public class EmailConsumer extends Thread {
                     try {
                         String domain = Email.getDomain(email.sender);
 
-                        // ignore if sender unknown
-                        if (isDomainKnown(domain)) {
-                            socket = initSocketTo(domain);
-                            reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                            writer = new PrintWriter(socket.getOutputStream(), true);
+                        socket = initSocketTo(domain);
+                        reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                        writer = new PrintWriter(socket.getOutputStream(), true);
 
-                            dmtpClientHandler = new DMTPClientHandler(socket, reader, writer);
-                            dmtpClientHandler.init();
-                            dmtpClientHandler.sendEmail(errorEmail, recipients -> {});
+                        dmtpClientHandler = new DMTPClientHandler(socket, reader, writer);
+                        dmtpClientHandler.init();
+                        dmtpClientHandler.sendEmail(errorEmail, recipients -> {});
 
-                            try {
-                                dmtpClientHandler.close();
-                            } catch (IOException | DMTPException e) {
-                                // An error here can be ignored: all the important work has already been done
-                                System.out.println(e.getMessage());
-                            }
-                        } else {
-                            System.out.println("Skipping error email: unknown domain");
+                        try {
+                            dmtpClientHandler.close();
+                        } catch (IOException | DMTPException e) {
+                            // An error here can be ignored: all the important work has already been done
+                            System.out.println(e.getMessage());
                         }
 
+                    } catch (DomainNotFoundException e) {
+                        System.out.println("Skipping error email: " + e.getMessage());
                     } catch (IOException | DMTPException e ) {
                         // Ignore errors at this point
                         System.out.println("Error sending error email: " + e.getMessage());
@@ -169,10 +166,31 @@ public class EmailConsumer extends Thread {
         }
     }
 
-    private Socket initSocketTo(String domain) throws IOException {
-        String addr = domainsConfig.getString(domain);
-        String ip = addr.split(":")[0];
-        int port = Integer.parseInt(addr.split(":")[1]);
+    private Socket initSocketTo(String domain) throws IOException, DomainNotFoundException {
+        if (rootNameserver == null)
+            throw new DomainNotFoundException("Null reference to root nameserver.");
+
+        // Iterative domain resolution
+        INameserverRemote currNameserver = rootNameserver;
+        String[] zones = domain.split("\\.");
+
+        String address = null;
+        try {
+            for (int i=zones.length-1; i>0; i--) {
+                currNameserver = currNameserver.getNameserver(zones[i]);
+                if (currNameserver == null)
+                    throw new DomainNotFoundException("nameserver for zone " + zones[i] + " not found.");
+            }
+            address = currNameserver.lookup(zones[0]);
+        } catch (RemoteException e) {
+            throw new DomainNotFoundException("Error executing nameserver remote method: " + e.getMessage());
+        }
+
+        if (address == null)
+            throw new DomainNotFoundException(domain + " is unknown to nameservers.");
+
+        String ip = address.split(":")[0];
+        int port = Integer.parseInt(address.split(":")[1]);
         return new Socket(ip, port);
     }
 
@@ -197,10 +215,6 @@ public class EmailConsumer extends Thread {
         }
 
         return errorEmail;
-    }
-
-    private boolean isDomainKnown(String domain) {
-        return domainsConfig.containsKey(domain);
     }
 
 }
