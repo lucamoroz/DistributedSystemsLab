@@ -10,6 +10,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import at.ac.tuwien.dsg.orvell.Shell;
@@ -102,8 +103,8 @@ public class Nameserver implements INameserver {
     @Override
     @Command
     public void addresses() {
-        List<String> addresses =
-                managedNameserverRemote.getAddresses().stream().sorted().collect(Collectors.toList());
+        Map<String, String> mailboxServerAddresses = managedNameserverRemote.getMailboxServerAddresses();
+        List<String> addresses = mailboxServerAddresses.keySet().stream().sorted().collect(Collectors.toList());
 
         if (addresses.isEmpty()) {
             shell.out().println("None");
@@ -111,7 +112,7 @@ public class Nameserver implements INameserver {
         }
 
         for (int i=1; i<=addresses.size(); i++)
-            shell.out().println(i + ". " + addresses.get(i-1));
+            shell.out().println(i + ". " + addresses.get(i-1) + " " + mailboxServerAddresses.get(addresses.get(i-1)));
     }
 
     @Override
