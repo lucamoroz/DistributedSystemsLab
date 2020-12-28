@@ -48,6 +48,7 @@ public class MessageClient implements IMessageClient, Runnable {
 
     @Override
     public void run() {
+        // create socket for DMTP connection
         try {
             dmtpSocket = new Socket(config.getString("transfer.host"), config.getInt("transfer.port"));
         } catch (IOException e) {
@@ -56,6 +57,7 @@ public class MessageClient implements IMessageClient, Runnable {
             return;
         }
 
+        // create handler wrapper for DMTP
         dmtpHandler = new DMTPHandlerThread(dmtpSocket, blockingQueue);
         if (!dmtpHandler.init()) {
             shutdown();
@@ -63,6 +65,7 @@ public class MessageClient implements IMessageClient, Runnable {
         }
         dmtpHandler.start();
 
+        // create socket for DMAP connection
         try {
             dmapSocket = new Socket(config.getString("mailbox.host"), config.getInt("mailbox.port"));
         } catch (IOException e) {
@@ -71,6 +74,7 @@ public class MessageClient implements IMessageClient, Runnable {
             return;
         }
 
+        // create handler wrapper for DMAP
         dmapHandler = new DMAPHandlerWrapper(dmapSocket);
         if (!dmapHandler.init(config.getString("mailbox.user"), config.getString("mailbox.password"))) {
             shutdown();
@@ -83,7 +87,7 @@ public class MessageClient implements IMessageClient, Runnable {
     @Override
     @Command
     public void inbox() {
-
+        dmapHandler.printInbox();
     }
 
     @Override
@@ -115,9 +119,11 @@ public class MessageClient implements IMessageClient, Runnable {
             return;
         }
 
+        // create recipient list and email object
         ArrayList<String> recipients = new ArrayList<>();
         recipients.add(to);
         Email email = new Email(sender, recipients, subject, data);
+        // add to blocking queue for processing in sender thread
         blockingQueue.add(email);
     }
 
@@ -144,6 +150,7 @@ public class MessageClient implements IMessageClient, Runnable {
             }
         }
 
+        // quit DMAP connection
         if (dmapHandler != null) {
             try {
                 dmapHandler.close();

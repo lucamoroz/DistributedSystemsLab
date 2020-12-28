@@ -2,12 +2,15 @@ package dslab.client;
 
 import dslab.protocols.dmap.DMAPClientHandler;
 import dslab.protocols.dmap.DMAPException;
+import dslab.protocols.dmtp.Email;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 public class DMAPHandlerWrapper {
     private final Socket socket;
@@ -41,6 +44,38 @@ public class DMAPHandlerWrapper {
         }
 
         return true;
+    }
+
+    public void printInbox() {
+        HashMap<Integer, String[]> emailListing;
+        try {
+            emailListing = handler.list();
+        } catch (IOException | DMAPException e) {
+            System.out.println("error receiving email list: " + e.getMessage());
+            return;
+        }
+
+        if (emailListing.size() == 0) {
+            System.out.println("No emails to display");
+            return;
+        }
+
+        ArrayList<Email> emails = new ArrayList<>();
+        for (int id : emailListing.keySet()) {
+            Email email;
+            try {
+                email = handler.show(id);
+            } catch (IOException | DMAPException e) {
+                System.out.println("error receiving email list: " + e.getMessage());
+                return;
+            }
+
+            emails.add(email);
+        }
+
+        for (Email email : emails) {
+            System.out.printf("%s%n", email.prettyPrint());
+        }
     }
 
     public void delete(int id) {

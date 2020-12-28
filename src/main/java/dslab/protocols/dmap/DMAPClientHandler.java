@@ -1,10 +1,15 @@
 package dslab.protocols.dmap;
 
+import dslab.protocols.dmtp.Email;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 
 public class DMAPClientHandler implements IDMAPClientHandler {
 
@@ -44,10 +49,13 @@ public class DMAPClientHandler implements IDMAPClientHandler {
         HashMap<Integer, String[]> emails = new HashMap<>();
 
         String command = "list";
-        String response = getResponseOrThrowException(command);
-        String[] lines = response.split("\n");
+        List<String> response = getResponseOrThrowException(command);
+        // check for empty inbox
+        if (response.get(0).startsWith("no emails")) {
+            return emails;
+        }
 
-        for (String line : lines) {
+        for (String line : response) {
             int id;
             try {
                 id = Integer.parseInt(line.substring(0, 1));
@@ -67,6 +75,86 @@ public class DMAPClientHandler implements IDMAPClientHandler {
     }
 
     @Override
+    public Email show(int id) throws IOException, DMAPException {
+        String command = String.format("show %d", id);
+        List<String> response = getResponseOrThrowException(command);
+        Email email = new Email();
+
+        for (String line : response) {
+            String[] tagAndData = line.split(" ", 2);
+            if (tagAndData.length < 1) {
+                throw new DMAPException(MALFORMED_ANSWER);
+            }
+
+            switch (tagAndData[0]) {
+                case "from": {
+                    if (tagAndData.length != 2) {
+                        throw new DMAPException(MALFORMED_ANSWER);
+                    }
+
+                    if (tagAndData[1].isBlank()) {
+                        throw new DMAPException(MALFORMED_ANSWER);
+                    }
+
+                    email.sender = tagAndData[1];
+                    break;
+                }
+                case "to": {
+                    if (tagAndData.length != 2) {
+                        throw new DMAPException(MALFORMED_ANSWER);
+                    }
+
+                    if (tagAndData[1].isBlank()) {
+                        throw new DMAPException(MALFORMED_ANSWER);
+                    }
+
+                    String[] recipients = tagAndData[1].split(", *");
+
+                    email.recipients = Arrays.asList(recipients);
+                    break;
+                }
+                case "subject": {
+                    if (tagAndData.length != 2) {
+                        continue;
+                    }
+
+                    if (tagAndData[1].isBlank()) {
+                        continue;
+                    }
+
+                    email.subject = tagAndData[1];
+
+                    break;
+                }
+                case "data": {
+                    if (tagAndData.length != 2) {
+                        continue;
+                    }
+
+                    if (tagAndData[1].isBlank()) {
+                        continue;
+                    }
+
+                    email.data = tagAndData[1];
+
+                    break;
+                }
+                default: {
+                    throw new DMAPException(UNEXPECTED_ANSWER);
+                }
+            }
+        }
+
+        if (email.sender == null || email.recipients == null || email.recipients.size() == 0) {
+            throw new DMAPException(MALFORMED_ANSWER);
+        }
+
+        email.id = id;
+
+        return email;
+    }
+
+    @Override
     public void delete(int id) throws IOException, DMAPException {
         String command = String.format("delete %d", id);
         executeOrThrowException(command, "ok");
@@ -78,7 +166,8 @@ public class DMAPClientHandler implements IDMAPClientHandler {
         executeOrThrowException(command, "ok bye");
     }
 
-    private String getResponseOrThrowException(String command) throws IOException, DMAPException {
+    private List<String> getResponseOrThrowException(String command) throws IOException, DMAPException {
+        ArrayList<String> response = new ArrayList<>();
         writer.println(command);
         String message = reader.readLine();
         if (message == null) throw new DMAPException(NO_ANSWER);
@@ -86,7 +175,12 @@ public class DMAPClientHandler implements IDMAPClientHandler {
             throw new DMAPException(message.substring(6));
         }
 
-        return message;
+        response.add(message);
+        while (reader.ready() && (message = reader.readLine()) != null) {
+            response.add(message);
+        }
+
+        return response;
     }
 
     private void executeOrThrowException(

@@ -16,6 +16,7 @@ public class Email {
         this.data = data;
     }
 
+    public int id;
     public String sender;
     public List<String> recipients;
     public String subject;
@@ -36,6 +37,15 @@ public class Email {
                 ", subject='" + subject + '\'' +
                 ", data='" + data + '\'' +
                 '}';
+    }
+
+    public String prettyPrint() {
+        String prettyString = String.format("(%d) %s%n", id, subject);
+        prettyString += String.format("\tfrom:\t%s%n", sender);
+        prettyString += String.format("\tto:\t%s%n", String.join("; ", recipients));
+        prettyString += String.format("\tdata:\t%s", data);
+
+        return prettyString;
     }
 
     public String printToDmtpFormat() {
