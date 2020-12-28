@@ -38,12 +38,8 @@ public class DMTPHandlerThread extends Thread {
         // Initialize handler and clean up on error
         try {
             handler.init();
-        } catch (IOException e) {
-            System.out.println("DMTP handler init threw IOException: " + e.getMessage());
-            closeResources();
-            return false;
-        } catch (DMTPException e) {
-            System.out.println("DMTP handler init threw DMTPException: " + e.getMessage());
+        } catch (IOException | DMTPException e) {
+            System.out.println("DMTP handler init threw exception: " + e.getMessage());
             closeResources();
             return false;
         }

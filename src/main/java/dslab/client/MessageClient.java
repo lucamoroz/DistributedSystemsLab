@@ -13,6 +13,7 @@ import at.ac.tuwien.dsg.orvell.Shell;
 import at.ac.tuwien.dsg.orvell.StopShellException;
 import at.ac.tuwien.dsg.orvell.annotation.Command;
 import dslab.ComponentFactory;
+import dslab.protocols.dmap.DMAPException;
 import dslab.protocols.dmtp.Email;
 import dslab.util.Config;
 
@@ -22,6 +23,7 @@ public class MessageClient implements IMessageClient, Runnable {
     private Socket dmtpSocket;
     private Socket dmapSocket;
     private DMTPHandlerThread dmtpHandler;
+    private DMAPHandlerWrapper dmapHandler;
     private final BlockingQueue<Email> blockingQueue;
     private final String sender;
 
@@ -49,20 +51,31 @@ public class MessageClient implements IMessageClient, Runnable {
         try {
             dmtpSocket = new Socket(config.getString("transfer.host"), config.getInt("transfer.port"));
         } catch (IOException e) {
-            throw new UncheckedIOException("Error while creating client DMTP socket", e);
+            System.out.println("Error while creating client DMTP socket: " + e.getMessage());
+            shutdown();
+            return;
         }
 
         dmtpHandler = new DMTPHandlerThread(dmtpSocket, blockingQueue);
         if (!dmtpHandler.init()) {
+            shutdown();
             return;
         }
         dmtpHandler.start();
 
-        /*try {
+        try {
             dmapSocket = new Socket(config.getString("mailbox.host"), config.getInt("mailbox.port"));
         } catch (IOException e) {
-            throw new UncheckedIOException("Error while creating client DMAP socket", e);
-        }*/
+            System.out.println("Error while creating client DMAP socket: " + e.getMessage());
+            shutdown();
+            return;
+        }
+
+        dmapHandler = new DMAPHandlerWrapper(dmapSocket);
+        if (!dmapHandler.init(config.getString("mailbox.user"), config.getString("mailbox.password"))) {
+            shutdown();
+            return;
+        }
 
         shell.run();
     }
@@ -76,7 +89,15 @@ public class MessageClient implements IMessageClient, Runnable {
     @Override
     @Command
     public void delete(String id) {
+        int parsedId;
+        try {
+            parsedId = Integer.parseInt(id);
+        } catch (NumberFormatException e) {
+            System.out.println("error given ID is not a valid integer");
+            return;
+        }
 
+        dmapHandler.delete(parsedId);
     }
 
     @Override
@@ -120,6 +141,14 @@ public class MessageClient implements IMessageClient, Runnable {
                 dmtpSocket.close();
             } catch (IOException e) {
                 shell.out().println("Error while closing DMTP socket: " + e.getMessage());
+            }
+        }
+
+        if (dmapHandler != null) {
+            try {
+                dmapHandler.close();
+            } catch (IOException | DMAPException e) {
+                shell.out().println("Error while closing DMAP connection: " + e.getMessage());
             }
         }
 
