@@ -1,9 +1,6 @@
 package dslab.client;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintStream;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -15,7 +12,11 @@ import at.ac.tuwien.dsg.orvell.annotation.Command;
 import dslab.ComponentFactory;
 import dslab.protocols.dmap.DMAPException;
 import dslab.protocols.dmtp.Email;
+import dslab.protocols.dmtp.VerificationException;
 import dslab.util.Config;
+import dslab.util.Keys;
+
+import javax.crypto.spec.SecretKeySpec;
 
 public class MessageClient implements IMessageClient, Runnable {
     final private Config config;
@@ -26,6 +27,7 @@ public class MessageClient implements IMessageClient, Runnable {
     private DMAPHandlerWrapper dmapHandler;
     private final BlockingQueue<Email> blockingQueue;
     private final String sender;
+    private SecretKeySpec secretKeySpec;
 
     /**
      * Creates a new client instance.
@@ -48,6 +50,16 @@ public class MessageClient implements IMessageClient, Runnable {
 
     @Override
     public void run() {
+        // load secret key spec
+        File file = new File("keys/hmac.key");
+        try {
+            secretKeySpec = Keys.readSecretKey(file);
+        } catch (IOException e) {
+            System.out.println("Error while reading secret key spec: " + e.getMessage());
+            shutdown();
+            return;
+        }
+
         // create socket for DMTP connection
         try {
             dmtpSocket = new Socket(config.getString("transfer.host"), config.getInt("transfer.port"));
@@ -107,7 +119,26 @@ public class MessageClient implements IMessageClient, Runnable {
     @Override
     @Command
     public void verify(String id) {
+        int parsedId;
+        try {
+            parsedId = Integer.parseInt(id);
+        } catch (NumberFormatException e) {
+            System.out.println("error given ID is not a valid integer");
+            return;
+        }
 
+        Email email = dmapHandler.getEmail(parsedId);
+        if (email == null) {
+            return;
+        }
+
+        try {
+            email.verify(secretKeySpec);
+        } catch (VerificationException e) {
+            System.out.println("error could not verify email: " + e.getMessage());
+        }
+
+        System.out.println("ok");
     }
 
     @Override

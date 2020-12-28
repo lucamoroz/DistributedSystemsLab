@@ -78,6 +78,18 @@ public class DMAPHandlerWrapper {
         }
     }
 
+    public Email getEmail(int id) {
+        Email email;
+        try {
+            email = handler.show(id);
+        } catch (IOException | DMAPException e) {
+            System.out.printf("error could not get email with id %d for verification: %s%n", id, e.getMessage());
+            return null;
+        }
+
+        return email;
+    }
+
     public void delete(int id) {
         try {
             handler.delete(id);
