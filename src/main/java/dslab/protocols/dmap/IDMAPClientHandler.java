@@ -3,6 +3,8 @@ package dslab.protocols.dmap;
 import dslab.protocols.dmtp.Email;
 
 import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
 import java.util.Map;
 
 public interface IDMAPClientHandler {
@@ -12,5 +14,5 @@ public interface IDMAPClientHandler {
     Email show(int id) throws DMAPException, IOException;
     void delete(int id) throws DMAPException, IOException;
     void close() throws DMAPException, IOException;
-
+    PublicKey stSecure() throws DMAPException, IOException, NoSuchAlgorithmException;
 }

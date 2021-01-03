@@ -1,11 +1,18 @@
 package dslab.protocols.dmap;
 
 import dslab.protocols.dmtp.Email;
+import dslab.util.Keys;
 
+import javax.crypto.*;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -73,6 +80,7 @@ public class DMAPClientHandler implements IDMAPClientHandler {
 
         return emails;
     }
+
 
     @Override
     public Email show(int id) throws IOException, DMAPException {
@@ -155,6 +163,40 @@ public class DMAPClientHandler implements IDMAPClientHandler {
     }
 
     @Override
+    public PublicKey stSecure() throws DMAPException, IOException, NoSuchAlgorithmException {
+        String command = "startsecure";
+        List<String> response = getResponseOrThrowException(command);
+        if(response.size() == 1){
+            String compID = response.get(0).split(" ", 2)[1];
+            compID = "keys/client/" + compID + "_pub.der";
+            File pubKey = new File(compID);
+            byte[] num = generateRandom(32);
+            PublicKey key = Keys.readPublicKey(pubKey);
+            Cipher cipher = null;
+            try {
+                cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                cipher.init(Cipher.ENCRYPT_MODE, key);
+                cipher.update(num);
+                byte[] cipherText = cipher.doFinal();
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            } catch (NoSuchPaddingException e) {
+                e.printStackTrace();
+            } catch (BadPaddingException e) {
+                e.printStackTrace();
+            } catch (IllegalBlockSizeException e) {
+                e.printStackTrace();
+            } catch (InvalidKeyException e) {
+                e.printStackTrace();
+            }
+            SecretKey aesKey = generateAES(16);
+            return Keys.readPublicKey(pubKey);
+        }else{
+            throw new DMAPException(NO_ANSWER);
+        }
+    }
+
+    @Override
     public void delete(int id) throws IOException, DMAPException {
         String command = String.format("delete %d", id);
         executeOrThrowException(command, "ok");
@@ -181,6 +223,19 @@ public class DMAPClientHandler implements IDMAPClientHandler {
         }
 
         return response;
+    }
+
+    private byte[] generateRandom(int length){
+        SecureRandom rdm = new SecureRandom();
+        final byte[] number = new byte[length];
+        rdm.nextBytes(number);
+        return number;
+    }
+
+    private SecretKey generateAES(int size) throws NoSuchAlgorithmException{
+        KeyGenerator gene = KeyGenerator.getInstance("AES");
+        gene.init(size);
+        return gene.generateKey();
     }
 
     private void executeOrThrowException(

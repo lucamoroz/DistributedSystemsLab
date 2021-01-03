@@ -1,11 +1,15 @@
 package dslab.protocols.dmap;
 
 import dslab.protocols.dmtp.Email;
+import dslab.util.Keys;
 
+import javax.crypto.Cipher;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.security.PrivateKey;
 import java.util.List;
 import java.util.Map;
 
@@ -15,11 +19,13 @@ public class DMAPServerHandler implements IDMAPServerHandler {
     private final BufferedReader reader;
     private final PrintWriter writer;
     private String loggedUser = null;
+    private String componentId;
 
-    public DMAPServerHandler(Socket socket, BufferedReader reader, PrintWriter writer) {
+    public DMAPServerHandler(Socket socket, BufferedReader reader, PrintWriter writer, String componentId) {
         this.socket = socket;
         this.reader = reader;
         this.writer = writer;
+        this.componentId = componentId;
     }
 
     @Override
@@ -33,6 +39,9 @@ public class DMAPServerHandler implements IDMAPServerHandler {
             String[] tokens = request.split(" ");
 
             switch (tokens[0]) {
+                case "startsecure":
+                    writer.println("ok " + componentId);
+                    break;
                 case "login":
 
                     if (this.loggedUser != null) {
@@ -134,6 +143,13 @@ public class DMAPServerHandler implements IDMAPServerHandler {
                     writer.println("ok");
 
                     break;
+                case "ok":
+                    PrivateKey key = getPrivateKey();
+                    Cipher cipher = null;
+                    cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                    cipher.init(Cipher.DECRYPT_MODE, key);
+                    byte[] challenge = cipher.doFinal();
+
                 case "quit":
 
                     writer.println("ok bye");
@@ -148,5 +164,12 @@ public class DMAPServerHandler implements IDMAPServerHandler {
 
         throw new DMAPException("protocol error");
 
+    }
+
+    private PrivateKey getPrivateKey() throws IOException{
+        String path = "keys/server/" + componentId + ".der";
+        File privKey = new File(path);
+        PrivateKey key = Keys.readPrivateKey(privKey);
+        return key;
     }
 }

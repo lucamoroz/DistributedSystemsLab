@@ -21,11 +21,12 @@ public class ClientHandler implements Runnable, IDMAPServerHandler.Callback {
 
     private final Config userConfig;
     private final IEmailStorage emailStorage;
-
+    private String componentId;
     private final Socket socket;
 
-    public ClientHandler(Config usersConfig, Socket socket) {
+    public ClientHandler(Config usersConfig, Socket socket, String componentId) {
         this.userConfig = usersConfig;
+        this.componentId = componentId;
         this.socket = socket;
 
         this.emailStorage = InMemoryEmailStorage.getEmailStorage();
@@ -40,7 +41,7 @@ public class ClientHandler implements Runnable, IDMAPServerHandler.Callback {
             reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             writer = new PrintWriter(socket.getOutputStream(), true);
 
-            IDMAPServerHandler handler = new DMAPServerHandler(socket, reader, writer);
+            IDMAPServerHandler handler = new DMAPServerHandler(socket, reader, writer, componentId);
             handler.handleClient(this);
 
         } catch (IOException e) {

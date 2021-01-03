@@ -17,6 +17,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
 
     final private Config config;
     final private Shell shell;
+    private String componentId;
     private ServerSocket dmapServerSocket;
     private ServerSocket dmtpServerSocket;
 
@@ -30,6 +31,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
      */
     public MailboxServer(String componentId, Config config, InputStream in, PrintStream out) {
         this.config = config;
+        this.componentId = componentId;
 
         shell = new Shell(in, out);
         shell.register(this);
@@ -46,7 +48,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
             dmapServerSocket = new ServerSocket(config.getInt("dmap.tcp.port"));
 
             new DMTPListenerThread(config, dmtpServerSocket).start();
-            new DMAPListenerThread(config, dmapServerSocket).start();
+            new DMAPListenerThread(config, dmapServerSocket, componentId).start();
 
 
         } catch (IOException e) {
