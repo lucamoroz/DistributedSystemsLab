@@ -49,6 +49,7 @@ public class SecurityHelper {
         return cipher;
     }
 
+
     public static Cipher generateCipher(String algorithm, int mode, Key key, IvParameterSpec iv) throws DMAPException {
         Cipher cipher;
         try {

@@ -4,6 +4,7 @@ import dslab.protocols.dmap.DMAPException;
 
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import javax.security.auth.DestroyFailedException;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
@@ -31,7 +32,15 @@ public class CipherDMAP {
         decryption = SecurityHelper.generateCipher(algorithm, Cipher.DECRYPT_MODE, key, iv);
     }
 
-    public CipherDMAP(int size, String algorithm, Key key) throws DMAPException{
+    public CipherDMAP(byte[] key, byte[] iv, String algorithm) throws DMAPException {
+        this.iv = new IvParameterSpec(iv);
+        this.key = new SecretKeySpec(key, 0, key.length, "AES");
+
+        encryption = SecurityHelper.generateCipher(algorithm, Cipher.ENCRYPT_MODE, this.key, this.iv);
+        decryption = SecurityHelper.generateCipher(algorithm, Cipher.DECRYPT_MODE, this.key, this.iv);
+    }
+
+    public CipherDMAP(String algorithm, Key key) throws DMAPException{
         this.key = key;
         encryption = SecurityHelper.generateCipher(algorithm, Cipher.ENCRYPT_MODE, key);
         decryption = SecurityHelper.generateCipher(algorithm, Cipher.DECRYPT_MODE, key);
