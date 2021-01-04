@@ -43,6 +43,8 @@ public interface IMessageClient extends Runnable {
      */
     void msg(String to, String subject, String data);
 
+    void startsecure();
+
     /**
      * Shuts down the application.
      */

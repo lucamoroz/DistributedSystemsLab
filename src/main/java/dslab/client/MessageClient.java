@@ -104,6 +104,12 @@ public class MessageClient implements IMessageClient, Runnable {
 
     @Override
     @Command
+    public void startsecure(){
+        dmapHandler.initSecure();
+    }
+
+    @Override
+    @Command
     public void delete(String id) {
         int parsedId;
         try {

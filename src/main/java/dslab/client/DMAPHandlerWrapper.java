@@ -78,6 +78,15 @@ public class DMAPHandlerWrapper {
         }
     }
 
+    public void initSecure(){
+        try {
+            handler.stSecure();
+        } catch (DMAPException | IOException e) {
+            System.out.printf("error could not establish secure connection with server: %s%n", e.getMessage());
+            closeResources();
+        }
+    }
+
     public Email getEmail(int id) {
         Email email;
         try {
