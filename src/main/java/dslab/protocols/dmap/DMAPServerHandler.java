@@ -34,6 +34,37 @@ public class DMAPServerHandler implements IDMAPServerHandler {
         this.componentId = componentId;
     }
 
+    private void initSecureCommunication() throws IOException, DMAPException {
+        String request = "";
+        PrivateKey key = SecurityHelper.getPrivateKey(componentId);
+        cipher = new CipherDMAP("RSA/ECB/PKCS1Padding", key);
+
+        while ((request = reader.readLine())!= null) {
+            request = new String(cipher.decrypt(
+                    SecurityHelper.decodeBase64(request)
+            ));
+
+            String[] tokens = request.split(" ");
+
+            if (tokens.length == 4) {
+                if(!tokens[0].equals("ok")) throw new DMAPException("error protocol error");
+                byte[] secret = SecurityHelper.decodeBase64(tokens[2]);
+                byte[] iv = SecurityHelper.decodeBase64(tokens[3]);
+                cipher = new CipherDMAP(secret, iv,"AES/CTR/NoPadding");
+                String answer = "ok " + tokens[1];
+                answer = SecurityHelper.enocdeToBase64(
+                        cipher.encrypt(answer.getBytes())
+                );
+                writer.println(answer);
+                isEncrypted = true;
+            }else if(tokens.length == 1 && tokens[0].equals("ok") && isEncrypted){
+                break;
+            }else{
+                throw new DMAPException("error protocol");
+            }
+        }
+    }
+
     @Override
     public void handleClient(Callback callback) throws IOException, DMAPException {
 
@@ -42,11 +73,19 @@ public class DMAPServerHandler implements IDMAPServerHandler {
 
         while ((request = reader.readLine())!= null) {
 
+
+            if(isEncrypted) {
+                request = new String(cipher.decrypt(
+                        SecurityHelper.decodeBase64(request)
+                ));
+            }
+
             String[] tokens = request.split(" ");
 
             switch (tokens[0]) {
                 case "startsecure":
                     writer.println("ok " + componentId);
+                    initSecureCommunication();
                     break;
                 case "login":
 
@@ -149,27 +188,9 @@ public class DMAPServerHandler implements IDMAPServerHandler {
                     writer.println("ok");
 
                     break;
-                case "ok":
-                    PrivateKey key = SecurityHelper.getPrivateKey(componentId);
-                    CipherDMAP rsaCipher = new CipherDMAP("RSA/ECB/PKCS1Padding", key);
-                    String message = new String(
-                            rsaCipher.decrypt(
-                                    SecurityHelper.decodeBase64(tokens[1])
-                            ));
-                    String[] res = message.split(" ");
-                    if(!res[0].equals("ok") || res.length != 4) throw new DMAPException("error protocol error");
-                    byte[] secret = SecurityHelper.decodeBase64(tokens[2]);
-                    byte[] iv = SecurityHelper.decodeBase64(tokens[3]);
-                    cipher = new CipherDMAP(secret, iv,"AES/CTR/NoPadding");
-                    String answer = "ok " + tokens[1];
-                    answer = SecurityHelper.enocdeToBase64(
-                            cipher.encrypt(answer.getBytes())
-                    );
-                    writer.println(answer);
-                    break;
                 case "quit":
-
                     writer.println("ok bye");
+                    this.isEncrypted = false;
                     this.loggedUser = null;
                     return;
 

@@ -14,5 +14,5 @@ public interface IDMAPClientHandler {
     Email show(int id) throws DMAPException, IOException;
     void delete(int id) throws DMAPException, IOException;
     void close() throws DMAPException, IOException;
-    boolean stSecure() throws DMAPException, IOException, NoSuchAlgorithmException;
+    void stSecure() throws DMAPException, IOException, NoSuchAlgorithmException;
 }

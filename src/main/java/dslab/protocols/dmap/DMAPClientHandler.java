@@ -28,9 +28,11 @@ public class DMAPClientHandler implements IDMAPClientHandler {
     private static final String WRONG_ANSWER = "protocol error wrong answer while establishing connection";
 
 
-    Socket socket;
-    BufferedReader reader;
-    PrintWriter writer;
+    private Socket socket;
+    private BufferedReader reader;
+    private PrintWriter writer;
+
+    private boolean isEncrypted = false;
 
     private CipherDMAP aesCipher;
 
@@ -168,7 +170,7 @@ public class DMAPClientHandler implements IDMAPClientHandler {
     }
 
     @Override
-    public boolean stSecure() throws DMAPException, IOException, NoSuchAlgorithmException {
+    public void stSecure() throws DMAPException, IOException {
         String command = "startsecure";
         List<String> response = getResponseOrThrowException(command);
         if(response.size() == 1){
@@ -195,7 +197,7 @@ public class DMAPClientHandler implements IDMAPClientHandler {
                 String[] results = answerSt.split(" ", 2);
                 byte[] challenge = SecurityHelper.decodeBase64(results[1]);
                 if(results[1].equals(numBase64) && Arrays.equals(challenge, num)){
-                    return true;
+                    isEncrypted = true;
                 }else{
                     aesCipher.destroy();
                     throw new DMAPException(WRONG_ANSWER);
@@ -218,20 +220,20 @@ public class DMAPClientHandler implements IDMAPClientHandler {
     @Override
     public void close() throws IOException, DMAPException {
         String command = "quit";
+        aesCipher.destroy();
         executeOrThrowException(command, "ok bye");
     }
 
     private List<String> getResponseOrThrowException(String command) throws IOException, DMAPException {
         ArrayList<String> response = new ArrayList<>();
-        writer.println(command);
-        String message = reader.readLine();
-        if (message == null) throw new DMAPException(NO_ANSWER);
+        String message = initWrite(command);
         if (message.startsWith("error ")) {
             throw new DMAPException(message.substring(6));
         }
 
         response.add(message);
         while (reader.ready() && (message = reader.readLine()) != null) {
+            message = decrypt(message);
             response.add(message);
         }
 
@@ -243,9 +245,7 @@ public class DMAPClientHandler implements IDMAPClientHandler {
             String expectedAnswer
     ) throws IOException, DMAPException {
 
-        writer.println(command);
-        String message = reader.readLine();
-        if (message == null) throw new DMAPException(NO_ANSWER);
+        String message = initWrite(command);
         if (!message.equals(expectedAnswer)) {
             if (message.startsWith("error ")) {
                 // Insert error message as content
@@ -254,6 +254,28 @@ public class DMAPClientHandler implements IDMAPClientHandler {
                 throw new DMAPException(UNEXPECTED_ANSWER);
             }
         }
+    }
+
+    private String initWrite(String command) throws DMAPException, IOException{
+        command = encrypt(command);
+        writer.println(command);
+        String message = reader.readLine();
+        if (message == null) throw new DMAPException(NO_ANSWER);
+        return decrypt(message);
+    }
+
+    private String encrypt(String command) throws DMAPException{
+        if(isEncrypted){
+            command = aesCipher.encryptString(command);
+        }
+        return command;
+    }
+
+    private String decrypt(String command) throws DMAPException{
+        if(isEncrypted){
+            command = aesCipher.decryptString(command);
+        }
+        return command;
     }
 
 
