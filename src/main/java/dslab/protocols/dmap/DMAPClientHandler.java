@@ -1,6 +1,7 @@
 package dslab.protocols.dmap;
 
 import dslab.protocols.dmtp.Email;
+import dslab.util.CipherDMAP;
 import dslab.util.Keys;
 import dslab.util.SecurityHelper;
 
@@ -24,11 +25,14 @@ public class DMAPClientHandler implements IDMAPClientHandler {
     private static final String UNEXPECTED_ANSWER = "protocol error unexpected answer";
     private static final String NO_ANSWER = "protocol error no answer";
     private static final String MALFORMED_ANSWER = "protocol error malformed answer";
+    private static final String WRONG_ANSWER = "protocol error wrong answer while establishing connection";
 
 
     Socket socket;
     BufferedReader reader;
     PrintWriter writer;
+
+    private CipherDMAP aesCipher;
 
     public DMAPClientHandler(Socket socket, BufferedReader reader, PrintWriter writer) {
         this.socket = socket;
@@ -164,25 +168,42 @@ public class DMAPClientHandler implements IDMAPClientHandler {
     }
 
     @Override
-    public PublicKey stSecure() throws DMAPException, IOException, NoSuchAlgorithmException {
+    public boolean stSecure() throws DMAPException, IOException, NoSuchAlgorithmException {
         String command = "startsecure";
         List<String> response = getResponseOrThrowException(command);
         if(response.size() == 1){
             String compID = response.get(0).split(" ", 2)[1];
             byte[] num = SecurityHelper.generateRandom(32);
-            String message = "ok " + SecurityHelper.enocdeToBase64(num);
+            String numBase64 = SecurityHelper.enocdeToBase64(num);
             PublicKey key = SecurityHelper.getPublicKey(compID);
-            Cipher cipher = SecurityHelper.generateCipher("RSA/ECB/PKCS1Padding", Cipher.ENCRYPT_MODE, key);
-            SecretKey aesKey = SecurityHelper.generateAESKey(16);
-            byte[] cipherText;
-            try {
-                cipherText = cipher.doFinal(message.getBytes());
-            }  catch (BadPaddingException | IllegalBlockSizeException e) {
-                throw new DMAPException("Bad Padding/Illegal Blocksize");
+            CipherDMAP pubCipher = new CipherDMAP("RSA/ECB/PKCS1Padding", key);
+            aesCipher = new CipherDMAP(16,256,"AES/CTR/NoPadding");
+            String message = "ok " + numBase64 + " " +
+                    SecurityHelper.enocdeToBase64(aesCipher.getKey().getEncoded()) + " " +
+                    SecurityHelper.enocdeToBase64(aesCipher.getIv().getIV());
+            byte[] cipherText = pubCipher.encrypt(message.getBytes());
+            String cipherMsg = SecurityHelper.enocdeToBase64(cipherText);
+            List<String> resp = getResponseOrThrowException(cipherMsg);
+            if(resp.size() != 1){
+                pubCipher.destroy();
+                throw new DMAPException(MALFORMED_ANSWER);
             }
-            String result = SecurityHelper.enocdeToBase64(cipherText);
-            List<String> resp = getResponseOrThrowException(result);
-            return null;
+
+            byte[] answer = SecurityHelper.decodeBase64(resp.get(0));
+            String answerSt = new String(aesCipher.decrypt(answer));
+            if(answerSt.startsWith("ok")){
+                String[] results = answerSt.split(" ", 2);
+                byte[] challenge = SecurityHelper.decodeBase64(results[1]);
+                if(results[1].equals(numBase64) && Arrays.equals(challenge, num)){
+                    return true;
+                }else{
+                    aesCipher.destroy();
+                    throw new DMAPException(WRONG_ANSWER);
+                }
+            }else{
+                throw new DMAPException(MALFORMED_ANSWER);
+            }
+
         }else{
             throw new DMAPException(NO_ANSWER);
         }

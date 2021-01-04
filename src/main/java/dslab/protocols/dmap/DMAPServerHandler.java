@@ -151,17 +151,22 @@ public class DMAPServerHandler implements IDMAPServerHandler {
                     break;
                 case "ok":
                     PrivateKey key = SecurityHelper.getPrivateKey(componentId);
-                    Cipher cipherRSA = SecurityHelper.generateCipher("RSA/ECB/PKCS1Padding",
-                            Cipher.DECRYPT_MODE, key);
-                    try {
-                        byte[] challenge = cipherRSA.doFinal(SecurityHelper.decodeBase64(tokens[1]));
-                    } catch (IllegalBlockSizeException e) {
-                        throw new DMAPException("Illegal Blocksize for the Cipher");
-                    } catch (BadPaddingException e) {
-                        throw new DMAPException("Bad Padding for the Cipher");
-                    }
-                    cipher = new CipherDMAP(16, 256,"AES/CTR/NoPadding");
-
+                    CipherDMAP rsaCipher = new CipherDMAP("RSA/ECB/PKCS1Padding", key);
+                    String message = new String(
+                            rsaCipher.decrypt(
+                                    SecurityHelper.decodeBase64(tokens[1])
+                            ));
+                    String[] res = message.split(" ");
+                    if(!res[0].equals("ok") || res.length != 4) throw new DMAPException("error protocol error");
+                    byte[] secret = SecurityHelper.decodeBase64(tokens[2]);
+                    byte[] iv = SecurityHelper.decodeBase64(tokens[3]);
+                    cipher = new CipherDMAP(secret, iv,"AES/CTR/NoPadding");
+                    String answer = "ok " + tokens[1];
+                    answer = SecurityHelper.enocdeToBase64(
+                            cipher.encrypt(answer.getBytes())
+                    );
+                    writer.println(answer);
+                    break;
                 case "quit":
 
                     writer.println("ok bye");
