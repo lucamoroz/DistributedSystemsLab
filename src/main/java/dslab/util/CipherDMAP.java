@@ -54,6 +54,18 @@ public class CipherDMAP {
         }
     }
 
+    public String encryptString(String input) throws DMAPException {
+        return SecurityHelper.enocdeToBase64(encrypt(input.getBytes()));
+    }
+
+    public String decryptString(String input) throws DMAPException{
+        try {
+            return new String(decryption.doFinal(SecurityHelper.decodeBase64(input)));
+        } catch (IllegalBlockSizeException | BadPaddingException e) {
+            throw new DMAPException("Error with Blocksize or Padding");
+        }
+    }
+
     public byte[] decrypt(byte[] input) throws DMAPException{
         try {
             return decryption.doFinal(input);
