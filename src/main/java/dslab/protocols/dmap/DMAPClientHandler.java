@@ -2,6 +2,7 @@ package dslab.protocols.dmap;
 
 import dslab.protocols.dmtp.Email;
 import dslab.util.Keys;
+import dslab.util.SecurityHelper;
 
 import javax.crypto.*;
 import java.io.BufferedReader;
@@ -168,29 +169,20 @@ public class DMAPClientHandler implements IDMAPClientHandler {
         List<String> response = getResponseOrThrowException(command);
         if(response.size() == 1){
             String compID = response.get(0).split(" ", 2)[1];
-            compID = "keys/client/" + compID + "_pub.der";
-            File pubKey = new File(compID);
-            byte[] num = generateRandom(32);
-            PublicKey key = Keys.readPublicKey(pubKey);
-            Cipher cipher = null;
+            byte[] num = SecurityHelper.generateRandom(32);
+            String message = "ok " + SecurityHelper.enocdeToBase64(num);
+            PublicKey key = SecurityHelper.getPublicKey(compID);
+            Cipher cipher = SecurityHelper.generateCipher("RSA/ECB/PKCS1Padding", Cipher.ENCRYPT_MODE, key);
+            SecretKey aesKey = SecurityHelper.generateAESKey(16);
+            byte[] cipherText;
             try {
-                cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-                cipher.init(Cipher.ENCRYPT_MODE, key);
-                cipher.update(num);
-                byte[] cipherText = cipher.doFinal();
-            } catch (NoSuchAlgorithmException e) {
-                e.printStackTrace();
-            } catch (NoSuchPaddingException e) {
-                e.printStackTrace();
-            } catch (BadPaddingException e) {
-                e.printStackTrace();
-            } catch (IllegalBlockSizeException e) {
-                e.printStackTrace();
-            } catch (InvalidKeyException e) {
-                e.printStackTrace();
+                cipherText = cipher.doFinal(message.getBytes());
+            }  catch (BadPaddingException | IllegalBlockSizeException e) {
+                throw new DMAPException("Bad Padding/Illegal Blocksize");
             }
-            SecretKey aesKey = generateAES(16);
-            return Keys.readPublicKey(pubKey);
+            String result = SecurityHelper.enocdeToBase64(cipherText);
+            List<String> resp = getResponseOrThrowException(result);
+            return null;
         }else{
             throw new DMAPException(NO_ANSWER);
         }
@@ -223,19 +215,6 @@ public class DMAPClientHandler implements IDMAPClientHandler {
         }
 
         return response;
-    }
-
-    private byte[] generateRandom(int length){
-        SecureRandom rdm = new SecureRandom();
-        final byte[] number = new byte[length];
-        rdm.nextBytes(number);
-        return number;
-    }
-
-    private SecretKey generateAES(int size) throws NoSuchAlgorithmException{
-        KeyGenerator gene = KeyGenerator.getInstance("AES");
-        gene.init(size);
-        return gene.generateKey();
     }
 
     private void executeOrThrowException(

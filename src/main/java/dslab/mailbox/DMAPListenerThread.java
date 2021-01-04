@@ -42,7 +42,7 @@ public class DMAPListenerThread extends Thread {
 
             try {
                 socket = serverSocket.accept();
-                Runnable clientHandler = new ClientHandler(userConfig, socket);
+                Runnable clientHandler = new ClientHandler(userConfig, socket, componentId);
                 executorService.submit(clientHandler);
 
             } catch (SocketException e) {

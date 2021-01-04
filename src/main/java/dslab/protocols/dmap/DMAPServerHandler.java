@@ -1,9 +1,13 @@
 package dslab.protocols.dmap;
 
 import dslab.protocols.dmtp.Email;
+import dslab.util.CipherDMAP;
 import dslab.util.Keys;
+import dslab.util.SecurityHelper;
 
+import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -18,6 +22,8 @@ public class DMAPServerHandler implements IDMAPServerHandler {
     private final Socket socket;
     private final BufferedReader reader;
     private final PrintWriter writer;
+    private boolean isEncrypted = false;
+    private CipherDMAP cipher;
     private String loggedUser = null;
     private String componentId;
 
@@ -31,7 +37,7 @@ public class DMAPServerHandler implements IDMAPServerHandler {
     @Override
     public void handleClient(Callback callback) throws IOException, DMAPException {
 
-        writer.println("ok DMAP");
+        writer.println("ok DMAP2.0");
         String request;
 
         while ((request = reader.readLine())!= null) {
@@ -144,11 +150,17 @@ public class DMAPServerHandler implements IDMAPServerHandler {
 
                     break;
                 case "ok":
-                    PrivateKey key = getPrivateKey();
-                    Cipher cipher = null;
-                    cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-                    cipher.init(Cipher.DECRYPT_MODE, key);
-                    byte[] challenge = cipher.doFinal();
+                    PrivateKey key = SecurityHelper.getPrivateKey(componentId);
+                    Cipher cipherRSA = SecurityHelper.generateCipher("RSA/ECB/PKCS1Padding",
+                            Cipher.DECRYPT_MODE, key);
+                    try {
+                        byte[] challenge = cipherRSA.doFinal(SecurityHelper.decodeBase64(tokens[1]));
+                    } catch (IllegalBlockSizeException e) {
+                        throw new DMAPException("Illegal Blocksize for the Cipher");
+                    } catch (BadPaddingException e) {
+                        throw new DMAPException("Bad Padding for the Cipher");
+                    }
+                    cipher = new CipherDMAP(16, 256,"AES/CTR/NoPadding");
 
                 case "quit":
 
@@ -164,12 +176,5 @@ public class DMAPServerHandler implements IDMAPServerHandler {
 
         throw new DMAPException("protocol error");
 
-    }
-
-    private PrivateKey getPrivateKey() throws IOException{
-        String path = "keys/server/" + componentId + ".der";
-        File privKey = new File(path);
-        PrivateKey key = Keys.readPrivateKey(privKey);
-        return key;
     }
 }
