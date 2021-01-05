@@ -145,6 +145,7 @@ public class DMAPServerHandler implements IDMAPServerHandler {
                             String header = entry.getKey().toString() + " " + entry.getValue().sender + " " + entry.getValue().subject;
                             sendMessage(header);
                         }
+                        sendMessage("ok");
                     }
 
                     break;
@@ -162,6 +163,7 @@ public class DMAPServerHandler implements IDMAPServerHandler {
                     Email email = callback.getEmail(this.loggedUser, Integer.parseInt(tokens[1]));
                     if (email != null) {
                         sendMessage(email.printToDmtpFormat());
+                        sendMessage("ok");
                     } else {
                         sendMessage("error unknown message id");
                     }
