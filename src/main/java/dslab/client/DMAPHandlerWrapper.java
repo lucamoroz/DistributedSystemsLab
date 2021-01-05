@@ -42,7 +42,6 @@ public class DMAPHandlerWrapper {
             closeResources();
             return false;
         }
-
         return true;
     }
 

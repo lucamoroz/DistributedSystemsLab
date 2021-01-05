@@ -76,9 +76,9 @@ public class CipherDMAP {
 
     public void destroy() throws DMAPException{
         try {
-            if (key instanceof SecretKey){
+            if (key instanceof SecretKey && !((SecretKey) key).isDestroyed()){
                 ((SecretKey) key).destroy();
-            }else if(key instanceof PrivateKey){
+            }else if(key instanceof PrivateKey && !((PrivateKey) key).isDestroyed()){
                 ((PrivateKey) key).destroy();
             }
         } catch (DestroyFailedException e) {
