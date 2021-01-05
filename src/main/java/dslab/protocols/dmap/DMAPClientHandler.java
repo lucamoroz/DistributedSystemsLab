@@ -45,6 +45,8 @@ public class DMAPClientHandler implements IDMAPClientHandler {
         if (!message.equals("ok DMAP2.0"))
             throw new DMAPException(UNEXPECTED_ANSWER);
 
+        stSecure();
+
         command = String.format("login %s %s", username, password);
         executeOrThrowException(command, "ok");
     }
@@ -202,6 +204,7 @@ public class DMAPClientHandler implements IDMAPClientHandler {
                 byte[] challenge = SecurityHelper.decodeBase64(results[1]);
                 if(results[1].equals(numBase64) && Arrays.equals(challenge, num)){
                     isEncrypted = true;
+                    sendMessage("ok");
                 }else{
                     aesCipher.destroy();
                     throw new DMAPException(WRONG_ANSWER);
@@ -228,6 +231,11 @@ public class DMAPClientHandler implements IDMAPClientHandler {
             aesCipher.destroy();
         }
         executeOrThrowException(command, "ok bye");
+    }
+
+    private void sendMessage(String msg) throws DMAPException {
+        msg = encrypt(msg);
+        writer.println(msg);
     }
 
     private List<String> getResponseOrThrowException(String command) throws IOException, DMAPException {
