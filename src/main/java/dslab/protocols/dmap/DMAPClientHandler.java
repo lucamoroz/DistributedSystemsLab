@@ -51,7 +51,7 @@ public class DMAPClientHandler implements IDMAPClientHandler {
         message = reader.readLine();
         if (message == null)
             throw new DMAPException(NO_ANSWER);
-        if (!message.equals("ok DMAP"))
+        if (!message.equals("ok DMAP2.0"))
             throw new DMAPException(UNEXPECTED_ANSWER);
 
         command = String.format("login %s %s", username, password);
