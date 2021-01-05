@@ -119,6 +119,10 @@ public class DMTPServerHandler implements IDMTPServerHandler {
                     writer.println("ok");
                     break;
 
+                case "hash":
+                    email.hash = request.substring(5);
+                    writer.println("ok");
+                    break;
                 case "send":
 
                     if (!request.equals("send")) {

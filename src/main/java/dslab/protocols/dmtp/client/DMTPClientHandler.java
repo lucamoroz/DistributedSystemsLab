@@ -70,6 +70,9 @@ public class DMTPClientHandler implements IDMTPClientHandler {
         command = "data " + email.data;
         executeOrThrowException(command, "ok", reader, writer);
 
+        command = "hash " + email.hash;
+        executeOrThrowException(command, "ok", reader, writer);
+
         command = "send";
         executeOrThrowException(command, "ok", reader, writer);
 
