@@ -64,6 +64,9 @@ public class DMAPClientHandler implements IDMAPClientHandler {
 
         for (String line : response) {
             int id;
+            if(line.startsWith("ok")){
+                break;
+            }
             try {
                 id = Integer.parseInt(line.substring(0, 1));
             } catch (NumberFormatException e) {
@@ -89,79 +92,83 @@ public class DMAPClientHandler implements IDMAPClientHandler {
         Email email = new Email();
 
         for (String line : response) {
-            String[] tagAndData = line.split(" ", 2);
+            if(line.equals("ok")) continue;
+
+            String[] tagAndData = line.split("\n");
             if (tagAndData.length < 1) {
                 throw new DMAPException(MALFORMED_ANSWER);
             }
+            for(String tag: tagAndData){
+                String[] dataSplit = tag.split(" ", 2);
+                switch (dataSplit[0]) {
+                    case "from": {
+                        if (dataSplit.length != 2) {
+                            throw new DMAPException(MALFORMED_ANSWER);
+                        }
 
-            switch (tagAndData[0]) {
-                case "from": {
-                    if (tagAndData.length != 2) {
-                        throw new DMAPException(MALFORMED_ANSWER);
+                        if (dataSplit[1].isBlank()) {
+                            throw new DMAPException(MALFORMED_ANSWER);
+                        }
+
+                        email.sender = dataSplit[1];
+                        break;
                     }
+                    case "to": {
+                        if (dataSplit.length != 2) {
+                            throw new DMAPException(MALFORMED_ANSWER);
+                        }
 
-                    if (tagAndData[1].isBlank()) {
-                        throw new DMAPException(MALFORMED_ANSWER);
+                        if (dataSplit[1].isBlank()) {
+                            throw new DMAPException(MALFORMED_ANSWER);
+                        }
+
+                        String[] recipients = dataSplit[1].split(", *");
+
+                        email.recipients = Arrays.asList(recipients);
+                        break;
                     }
+                    case "subject": {
+                        if (dataSplit.length != 2) {
+                            continue;
+                        }
 
-                    email.sender = tagAndData[1];
-                    break;
-                }
-                case "to": {
-                    if (tagAndData.length != 2) {
-                        throw new DMAPException(MALFORMED_ANSWER);
+                        if (dataSplit[1].isBlank()) {
+                            continue;
+                        }
+
+                        email.subject = dataSplit[1];
+
+                        break;
                     }
+                    case "data": {
+                        if (dataSplit.length != 2) {
+                            continue;
+                        }
 
-                    if (tagAndData[1].isBlank()) {
-                        throw new DMAPException(MALFORMED_ANSWER);
+                        if (dataSplit[1].isBlank()) {
+                            continue;
+                        }
+
+                        email.data = dataSplit[1];
+
+                        break;
                     }
+                    case "hash": {
+                        if (dataSplit.length != 2) {
+                            continue;
+                        }
 
-                    String[] recipients = tagAndData[1].split(", *");
+                        if (dataSplit[1].isBlank()) {
+                            throw new DMAPException(NO_HASH);
+                        }
 
-                    email.recipients = Arrays.asList(recipients);
-                    break;
-                }
-                case "subject": {
-                    if (tagAndData.length != 2) {
-                        continue;
+                        email.hash = dataSplit[1];
+
+                        break;
                     }
-
-                    if (tagAndData[1].isBlank()) {
-                        continue;
+                    default: {
+                        throw new DMAPException(UNEXPECTED_ANSWER);
                     }
-
-                    email.subject = tagAndData[1];
-
-                    break;
-                }
-                case "data": {
-                    if (tagAndData.length != 2) {
-                        continue;
-                    }
-
-                    if (tagAndData[1].isBlank()) {
-                        continue;
-                    }
-
-                    email.data = tagAndData[1];
-
-                    break;
-                }
-                case "hash": {
-                    if (tagAndData.length != 2) {
-                        continue;
-                    }
-
-                    if (tagAndData[1].isBlank()) {
-                        throw new DMAPException(NO_HASH);
-                    }
-
-                    email.hash = tagAndData[1];
-
-                    break;
-                }
-                default: {
-                    throw new DMAPException(UNEXPECTED_ANSWER);
                 }
             }
         }

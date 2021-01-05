@@ -75,6 +75,7 @@ public class DMAPHandlerWrapper {
         for (Email email : emails) {
             System.out.printf("%s%n", email.prettyPrint());
         }
+        System.out.println("ok");
     }
 
     public void initSecure(){
@@ -104,8 +105,6 @@ public class DMAPHandlerWrapper {
         } catch (IOException | DMAPException e) {
             System.out.printf("error could not delete message with id %d: %s%n", id, e.getMessage());
         }
-
-        System.out.println("ok");
     }
 
     public void close() throws IOException, DMAPException {

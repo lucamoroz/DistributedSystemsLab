@@ -58,8 +58,8 @@ public class Email {
         return "from " + sender + "\n" +
                 "to " + String.join(",", recipients) + "\n" +
                 "subject " + subject + "\n" +
-                "data " + data +
-                "hash " + hash;
+                "data " + data + "\n" +
+                "hash " + (hash == null ? "" : hash);
     }
 
     public String getHash(SecretKeySpec secret) throws VerificationException {
