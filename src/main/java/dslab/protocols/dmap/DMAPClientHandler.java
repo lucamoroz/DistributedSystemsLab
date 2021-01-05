@@ -2,19 +2,12 @@ package dslab.protocols.dmap;
 
 import dslab.protocols.dmtp.Email;
 import dslab.util.CipherDMAP;
-import dslab.util.Keys;
 import dslab.util.SecurityHelper;
 
-import javax.crypto.*;
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.net.Socket;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -26,18 +19,16 @@ public class DMAPClientHandler implements IDMAPClientHandler {
     private static final String NO_ANSWER = "protocol error no answer";
     private static final String MALFORMED_ANSWER = "protocol error malformed answer";
     private static final String WRONG_ANSWER = "protocol error wrong answer while establishing connection";
+    private static final String NO_HASH = "tried to send hash but received blank";
 
-
-    private Socket socket;
-    private BufferedReader reader;
-    private PrintWriter writer;
+    private final BufferedReader reader;
+    private final PrintWriter writer;
 
     private boolean isEncrypted = false;
 
     private CipherDMAP aesCipher;
 
-    public DMAPClientHandler(Socket socket, BufferedReader reader, PrintWriter writer) {
-        this.socket = socket;
+    public DMAPClientHandler(BufferedReader reader, PrintWriter writer) {
         this.reader = reader;
         this.writer = writer;
     }
@@ -154,6 +145,19 @@ public class DMAPClientHandler implements IDMAPClientHandler {
 
                     break;
                 }
+                case "hash": {
+                    if (tagAndData.length != 2) {
+                        continue;
+                    }
+
+                    if (tagAndData[1].isBlank()) {
+                        throw new DMAPException(NO_HASH);
+                    }
+
+                    email.hash = tagAndData[1];
+
+                    break;
+                }
                 default: {
                     throw new DMAPException(UNEXPECTED_ANSWER);
                 }
@@ -220,7 +224,9 @@ public class DMAPClientHandler implements IDMAPClientHandler {
     @Override
     public void close() throws IOException, DMAPException {
         String command = "quit";
-        aesCipher.destroy();
+        if (aesCipher != null) {
+            aesCipher.destroy();
+        }
         executeOrThrowException(command, "ok bye");
     }
 

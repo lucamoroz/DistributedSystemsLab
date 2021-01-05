@@ -32,7 +32,7 @@ public class DMAPHandlerWrapper {
             return false;
         }
 
-        handler = new DMAPClientHandler(socket, reader, writer);
+        handler = new DMAPClientHandler(reader, writer);
 
         // Initialize handler and clean up on error
         try {
