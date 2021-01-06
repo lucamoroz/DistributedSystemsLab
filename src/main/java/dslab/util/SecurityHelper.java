@@ -17,7 +17,11 @@ import java.util.Base64;
  */
 public class SecurityHelper {
 
-
+    /**
+     * Generates a random number
+     * @param length Length of the random
+     * @return Random Number as byte array
+     */
     public static byte[] generateRandom(int length){
         SecureRandom rdm = new SecureRandom();
         final byte[] number = new byte[length];
@@ -36,6 +40,14 @@ public class SecurityHelper {
         return new IvParameterSpec(iv);
     }
 
+    /**
+     * Generates a cipher used with asymmetric keyschemes
+     * @param algorithm Used algorithm
+     * @param mode Mode for the Cipher
+     * @param key Key of the scheme
+     * @return A Cipher with the given parameters
+     * @throws DMAPException Throws if there is a issue with the creation of the cipher
+     */
     public static Cipher generateCipher(String algorithm, int mode, Key key) throws DMAPException {
         Cipher cipher;
         try {
@@ -50,6 +62,15 @@ public class SecurityHelper {
     }
 
 
+    /**
+     * Generates a cipher for symmetric encryption
+     * @param algorithm Used algorithm
+     * @param mode Mode for the Cipher
+     * @param key Key of the scheme
+     * @param iv IV for the encryption
+     * @return A Cipher with the given parameters
+     * @throws DMAPException Throws if there is a issue with the creation of the cipher
+     */
     public static Cipher generateCipher(String algorithm, int mode, Key key, IvParameterSpec iv) throws DMAPException {
         Cipher cipher;
         try {

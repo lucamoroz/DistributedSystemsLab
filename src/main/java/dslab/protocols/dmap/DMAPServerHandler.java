@@ -36,6 +36,8 @@ public class DMAPServerHandler implements IDMAPServerHandler {
 
     private void initSecureCommunication() throws IOException, DMAPException {
         String request = "";
+
+        // Get private key for the server and create a new cipher based on it
         PrivateKey key = SecurityHelper.getPrivateKey(componentId);
         cipher = new CipherDMAP("RSA/ECB/PKCS1Padding", key);
 
@@ -46,11 +48,16 @@ public class DMAPServerHandler implements IDMAPServerHandler {
 
             String[] tokens = request.split(" ");
 
+            // Check if the message matches: ok <challenge> <sk> <iv>
             if (tokens.length == 4) {
                 if(!tokens[0].equals("ok")) throw new DMAPException("error protocol error");
+
+                // Decode the secret and iv from base64
                 byte[] secret = SecurityHelper.decodeBase64(tokens[2]);
                 byte[] iv = SecurityHelper.decodeBase64(tokens[3]);
                 cipher = new CipherDMAP(secret, iv,"AES/CTR/NoPadding");
+
+                // Build response with the challenge
                 String answer = "ok " + tokens[1];
                 answer = SecurityHelper.enocdeToBase64(
                         cipher.encrypt(answer.getBytes())
@@ -65,6 +72,11 @@ public class DMAPServerHandler implements IDMAPServerHandler {
         }
     }
 
+    /**
+     * Sends a message to the client. The message is encrypted if a secure connection has already been successfully established
+     * @param msg Message which is going to be sent to the server
+     * @throws DMAPException Thorwn if there is a problem with the encryption or the sending of the message
+     */
     private void sendMessage(String msg) throws DMAPException{
         if (isEncrypted) {
             writer.println(cipher.encryptString(msg));
@@ -93,6 +105,7 @@ public class DMAPServerHandler implements IDMAPServerHandler {
             switch (tokens[0]) {
                 case "startsecure":
                     if(isEncrypted) {
+                        // check if there is already a secure communication
                         sendMessage("A secure communication has already been started!");
                         break;
                     }

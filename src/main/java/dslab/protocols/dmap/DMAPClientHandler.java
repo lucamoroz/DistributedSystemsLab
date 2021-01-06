@@ -190,34 +190,57 @@ public class DMAPClientHandler implements IDMAPClientHandler {
     @Override
     public void stSecure() throws DMAPException, IOException {
         String command = "startsecure";
-        String response = writeAndGetResponse(command);
-        String compID = response.split(" ", 2)[1];
-        byte[] num = SecurityHelper.generateRandom(32);
-        String numBase64 = SecurityHelper.enocdeToBase64(num);
-        PublicKey key = SecurityHelper.getPublicKey(compID);
-        CipherDMAP pubCipher = new CipherDMAP("RSA/ECB/PKCS1Padding", key);
-        aesCipher = new CipherDMAP(16,256,"AES/CTR/NoPadding");
-        String message = "ok " + numBase64 + " " +
-                SecurityHelper.enocdeToBase64(aesCipher.getKey().getEncoded()) + " " +
-                SecurityHelper.enocdeToBase64(aesCipher.getIv().getIV());
-        byte[] cipherText = pubCipher.encrypt(message.getBytes());
-        String cipherMsg = SecurityHelper.enocdeToBase64(cipherText);
-        String resp = writeAndGetResponse(cipherMsg);
+        // Send startsecure to the server
+        List<String> response = getResponseOrThrowException(command);
+        if(response.size() == 1){
+            String compID = response.get(0).split(" ", 2)[1];
 
-        byte[] answer = SecurityHelper.decodeBase64(resp);
-        String answerSt = new String(aesCipher.decrypt(answer));
-        if(answerSt.startsWith("ok")){
-            String[] results = answerSt.split(" ", 2);
-            byte[] challenge = SecurityHelper.decodeBase64(results[1]);
-            if(results[1].equals(numBase64) && Arrays.equals(challenge, num)){
-                isEncrypted = true;
-                sendMessage("ok");
-            }else{
-                aesCipher.destroy();
-                throw new DMAPException(WRONG_ANSWER);
+            // Generate random challenge
+            byte[] num = SecurityHelper.generateRandom(32);
+            String numBase64 = SecurityHelper.enocdeToBase64(num);
+            PublicKey key = SecurityHelper.getPublicKey(compID);
+            CipherDMAP pubCipher = new CipherDMAP("RSA/ECB/PKCS1Padding", key);
+            aesCipher = new CipherDMAP(16,256,"AES/CTR/NoPadding");
+
+            // Build the resulting message for the Server
+            String message = "ok " + numBase64 + " " +
+                    SecurityHelper.enocdeToBase64(aesCipher.getKey().getEncoded()) + " " +
+                    SecurityHelper.enocdeToBase64(aesCipher.getIv().getIV());
+
+            // Encrypt the message
+            byte[] cipherText = pubCipher.encrypt(message.getBytes());
+
+            // Encode the message as Base64
+            String cipherMsg = SecurityHelper.enocdeToBase64(cipherText);
+            List<String> resp = getResponseOrThrowException(cipherMsg);
+            if(resp.size() != 1){
+                pubCipher.destroy();
+                throw new DMAPException(MALFORMED_ANSWER);
             }
+
+            // Decode the answer
+            byte[] answer = SecurityHelper.decodeBase64(resp.get(0));
+
+            // Decrypt the resulting message
+            String answerSt = new String(aesCipher.decrypt(answer));
+            if(answerSt.startsWith("ok")){
+                String[] results = answerSt.split(" ", 2);
+                byte[] challenge = SecurityHelper.decodeBase64(results[1]);
+
+                // Check if the response from the server matches the generated one
+                if(results[1].equals(numBase64) && Arrays.equals(challenge, num)){
+                    isEncrypted = true;
+                    sendMessage("ok");
+                }else{
+                    aesCipher.destroy();
+                    throw new DMAPException(WRONG_ANSWER);
+                }
+            }else{
+                throw new DMAPException(MALFORMED_ANSWER);
+            }
+
         }else{
-            throw new DMAPException(MALFORMED_ANSWER);
+            throw new DMAPException(NO_ANSWER);
         }
     }
 

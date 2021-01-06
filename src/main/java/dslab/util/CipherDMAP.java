@@ -10,6 +10,9 @@ import java.security.Key;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 
+/**
+ * Cipherclass to accomodate the encryption and decryption ciphers
+ */
 public class CipherDMAP {
 
     private Cipher encryption;
@@ -19,6 +22,14 @@ public class CipherDMAP {
 
     private Key key;
 
+
+    /**
+     * Constructor for the symmetric ciphers
+     * @param ivSize Size for the Init Vector
+     * @param skSize Size of the SecretKey
+     * @param algorithm Used Algorithm for the encryption
+     * @throws DMAPException Throws if there a issue with the creation of the Ciphers
+     */
     public CipherDMAP(int ivSize, int skSize, String algorithm) throws DMAPException {
         iv = SecurityHelper.generateIv(ivSize);
 
@@ -32,6 +43,13 @@ public class CipherDMAP {
         decryption = SecurityHelper.generateCipher(algorithm, Cipher.DECRYPT_MODE, key, iv);
     }
 
+    /**
+     * Constructor for the Cipher is the SecretKey and the IV are already known
+     * @param key SecretKey
+     * @param iv IV
+     * @param algorithm Used Algorithm
+     * @throws DMAPException Throws if there a issue with the creation of the Ciphers
+     */
     public CipherDMAP(byte[] key, byte[] iv, String algorithm) throws DMAPException {
         this.iv = new IvParameterSpec(iv);
         this.key = new SecretKeySpec(key, 0, key.length, "AES");
@@ -40,6 +58,13 @@ public class CipherDMAP {
         decryption = SecurityHelper.generateCipher(algorithm, Cipher.DECRYPT_MODE, this.key, this.iv);
     }
 
+
+    /**
+     * Constructor for the asymmetric Ciphers
+     * @param algorithm Used Algorithm
+     * @param key Key for the Ciphers (Can either be a PrivateKey or a PublicKey)
+     * @throws DMAPException Throws if there a issue with the creation of the Ciphers
+     */
     public CipherDMAP(String algorithm, Key key) throws DMAPException{
         this.key = key;
         encryption = SecurityHelper.generateCipher(algorithm, Cipher.ENCRYPT_MODE, key);
@@ -77,6 +102,8 @@ public class CipherDMAP {
     public void destroy() throws DMAPException{
         try {
             if (key instanceof SecretKey && !((SecretKey) key).isDestroyed()){
+                // set Key to null
+                // There is no implementation for SecretKey.destroy()
                 key = null;
             }else if(key instanceof PrivateKey && !((PrivateKey) key).isDestroyed()){
                 ((PrivateKey) key).destroy();
