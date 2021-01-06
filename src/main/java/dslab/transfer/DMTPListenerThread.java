@@ -1,5 +1,6 @@
 package dslab.transfer;
 
+import dslab.nameserver.INameserverRemote;
 import dslab.protocols.dmtp.Email;
 import dslab.util.Config;
 
@@ -8,6 +9,10 @@ import java.io.UncheckedIOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.rmi.NotBoundException;
+import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -18,20 +23,20 @@ public class DMTPListenerThread extends Thread {
     public static final int N_PRODUCERS = 2;
 
     private final ServerSocket serverSocket;
-    private final Config domainsConfig;
     private final Config transferConfig;
+    private final INameserverRemote rootNameserver;
     private final ExecutorService producersExecutorService;
     private final ExecutorService consumersExecutorService;
     private final ArrayBlockingQueue<Email> blockingQueue;
 
-    public DMTPListenerThread(ServerSocket serverSocket, Config config) {
+    public DMTPListenerThread(ServerSocket serverSocket, Config config, INameserverRemote rootNameserver) {
         this.serverSocket = serverSocket;
+        this.rootNameserver = rootNameserver;
 
         // Unlimited size thread pool vs limited size: this is an heuristic. Risk is thread starvation
         this.producersExecutorService = Executors.newFixedThreadPool(N_PRODUCERS);
         this.consumersExecutorService = Executors.newFixedThreadPool(N_CONSUMERS);
 
-        this.domainsConfig = new Config("domains");
         this.transferConfig = config;
 
         // Alternative is an unbounded LinkedBlockingQueue, but if producers produce more than consumers and the server
@@ -45,7 +50,7 @@ public class DMTPListenerThread extends Thread {
     public void run() {
 
         for (int i = 0; i < N_CONSUMERS; i++)
-            consumersExecutorService.submit(new EmailConsumer(domainsConfig, blockingQueue));
+            consumersExecutorService.submit(new EmailConsumer(rootNameserver, blockingQueue));
 
         Socket socket = null;
 
@@ -70,5 +75,4 @@ public class DMTPListenerThread extends Thread {
         consumersExecutorService.shutdownNow();
 
     }
-
 }
