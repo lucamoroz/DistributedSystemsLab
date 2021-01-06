@@ -50,10 +50,10 @@ public interface INameserverRemote extends Remote {
     INameserverRemote getNameserver(String zone) throws RemoteException;
 
     /**
-     * @param username
+     * @param domain
      * @return
      * @throws RemoteException
      */
-    String lookup(String username) throws RemoteException;
+    String lookup(String domain) throws RemoteException;
 
 }
