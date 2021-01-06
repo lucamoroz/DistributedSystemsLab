@@ -72,7 +72,6 @@ public class DMAPHandlerWrapper {
         for (Email email : emails) {
             printStream.printf("%s%n", email.prettyPrint());
         }
-        printStream.println("ok");
     }
 
     public void initSecure(){
