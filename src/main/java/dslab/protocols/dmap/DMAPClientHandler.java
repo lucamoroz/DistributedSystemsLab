@@ -66,14 +66,23 @@ public class DMAPClientHandler implements IDMAPClientHandler {
             if(line.startsWith("ok")){
                 break;
             }
+
+            int idStringLength = 0;
             try {
-                id = Integer.parseInt(line.substring(0, 1));
+                String[] idString = line.split(" ", 2);
+                if (idString.length < 2) {
+                    System.out.println("missing id in email listing. skipping entry");
+                    continue;
+                }
+
+                id = Integer.parseInt(idString[0]);
+                idStringLength = idString[0].length();
             } catch (NumberFormatException e) {
                 System.out.println("could not parse email ID. skipping entry");
                 continue;
             }
 
-            String[] senderSubject = line.substring(2).split(" ", 2);
+            String[] senderSubject = line.substring(idStringLength + 1).split(" ", 2);
             if (senderSubject.length < 1) {
                 System.out.println("could not parse sender and subject. skipping entry");
                 continue;
@@ -129,11 +138,8 @@ public class DMAPClientHandler implements IDMAPClientHandler {
                         break;
                     }
                     case "subject": {
-                        if (dataSplit.length != 2) {
-                            continue;
-                        }
-
-                        if (dataSplit[1].isBlank()) {
+                        if (dataSplit.length != 2 || dataSplit[1].isBlank()) {
+                            email.subject = "";
                             continue;
                         }
 
@@ -142,11 +148,8 @@ public class DMAPClientHandler implements IDMAPClientHandler {
                         break;
                     }
                     case "data": {
-                        if (dataSplit.length != 2) {
-                            continue;
-                        }
-
-                        if (dataSplit[1].isBlank()) {
+                        if (dataSplit.length != 2 || dataSplit[1].isBlank()) {
+                            email.data = "";
                             continue;
                         }
 
@@ -155,17 +158,18 @@ public class DMAPClientHandler implements IDMAPClientHandler {
                         break;
                     }
                     case "hash": {
-                        if (dataSplit.length != 2) {
-                            continue;
-                        }
-
-                        if (dataSplit[1].isBlank()) {
+                        if (dataSplit.length != 2 || dataSplit[1].isBlank()) {
+                            email.hash = "";
                             continue;
                         }
 
                         email.hash = dataSplit[1];
 
                         break;
+                    }
+                    case "ok": {
+                        // catch ok just in case
+                        continue;
                     }
                     default: {
                         throw new DMAPException(UNEXPECTED_ANSWER);
@@ -186,43 +190,34 @@ public class DMAPClientHandler implements IDMAPClientHandler {
     @Override
     public void stSecure() throws DMAPException, IOException {
         String command = "startsecure";
-        List<String> response = getResponseOrThrowException(command);
-        if(response.size() == 1){
-            String compID = response.get(0).split(" ", 2)[1];
-            byte[] num = SecurityHelper.generateRandom(32);
-            String numBase64 = SecurityHelper.enocdeToBase64(num);
-            PublicKey key = SecurityHelper.getPublicKey(compID);
-            CipherDMAP pubCipher = new CipherDMAP("RSA/ECB/PKCS1Padding", key);
-            aesCipher = new CipherDMAP(16,256,"AES/CTR/NoPadding");
-            String message = "ok " + numBase64 + " " +
-                    SecurityHelper.enocdeToBase64(aesCipher.getKey().getEncoded()) + " " +
-                    SecurityHelper.enocdeToBase64(aesCipher.getIv().getIV());
-            byte[] cipherText = pubCipher.encrypt(message.getBytes());
-            String cipherMsg = SecurityHelper.enocdeToBase64(cipherText);
-            List<String> resp = getResponseOrThrowException(cipherMsg);
-            if(resp.size() != 1){
-                pubCipher.destroy();
-                throw new DMAPException(MALFORMED_ANSWER);
-            }
+        String response = writeAndGetResponse(command);
+        String compID = response.split(" ", 2)[1];
+        byte[] num = SecurityHelper.generateRandom(32);
+        String numBase64 = SecurityHelper.enocdeToBase64(num);
+        PublicKey key = SecurityHelper.getPublicKey(compID);
+        CipherDMAP pubCipher = new CipherDMAP("RSA/ECB/PKCS1Padding", key);
+        aesCipher = new CipherDMAP(16,256,"AES/CTR/NoPadding");
+        String message = "ok " + numBase64 + " " +
+                SecurityHelper.enocdeToBase64(aesCipher.getKey().getEncoded()) + " " +
+                SecurityHelper.enocdeToBase64(aesCipher.getIv().getIV());
+        byte[] cipherText = pubCipher.encrypt(message.getBytes());
+        String cipherMsg = SecurityHelper.enocdeToBase64(cipherText);
+        String resp = writeAndGetResponse(cipherMsg);
 
-            byte[] answer = SecurityHelper.decodeBase64(resp.get(0));
-            String answerSt = new String(aesCipher.decrypt(answer));
-            if(answerSt.startsWith("ok")){
-                String[] results = answerSt.split(" ", 2);
-                byte[] challenge = SecurityHelper.decodeBase64(results[1]);
-                if(results[1].equals(numBase64) && Arrays.equals(challenge, num)){
-                    isEncrypted = true;
-                    sendMessage("ok");
-                }else{
-                    aesCipher.destroy();
-                    throw new DMAPException(WRONG_ANSWER);
-                }
+        byte[] answer = SecurityHelper.decodeBase64(resp);
+        String answerSt = new String(aesCipher.decrypt(answer));
+        if(answerSt.startsWith("ok")){
+            String[] results = answerSt.split(" ", 2);
+            byte[] challenge = SecurityHelper.decodeBase64(results[1]);
+            if(results[1].equals(numBase64) && Arrays.equals(challenge, num)){
+                isEncrypted = true;
+                sendMessage("ok");
             }else{
-                throw new DMAPException(MALFORMED_ANSWER);
+                aesCipher.destroy();
+                throw new DMAPException(WRONG_ANSWER);
             }
-
         }else{
-            throw new DMAPException(NO_ANSWER);
+            throw new DMAPException(MALFORMED_ANSWER);
         }
     }
 
@@ -248,13 +243,10 @@ public class DMAPClientHandler implements IDMAPClientHandler {
 
     private List<String> getResponseOrThrowException(String command) throws IOException, DMAPException {
         ArrayList<String> response = new ArrayList<>();
-        String message = initWrite(command);
-        if (message.startsWith("error ")) {
-            throw new DMAPException(message.substring(6));
-        }
+        String message = writeAndGetResponse(command);
 
         response.add(message);
-        while (reader.ready() && (message = reader.readLine()) != null) {
+        while ((message = reader.readLine()) != null) {
             message = decrypt(message);
             if (message.equals("ok")) {
                 break;
@@ -270,7 +262,7 @@ public class DMAPClientHandler implements IDMAPClientHandler {
             String expectedAnswer
     ) throws IOException, DMAPException {
 
-        String message = initWrite(command);
+        String message = writeAndGetResponse(command);
         if (!message.equals(expectedAnswer)) {
             if (message.startsWith("error ")) {
                 // Insert error message as content
@@ -281,11 +273,14 @@ public class DMAPClientHandler implements IDMAPClientHandler {
         }
     }
 
-    private String initWrite(String command) throws DMAPException, IOException{
+    private String writeAndGetResponse(String command) throws DMAPException, IOException{
         command = encrypt(command);
         writer.println(command);
         String message = reader.readLine();
         if (message == null) throw new DMAPException(NO_ANSWER);
+        if (message.startsWith("error ")) {
+            throw new DMAPException(message.substring(6));
+        }
         return decrypt(message);
     }
 
