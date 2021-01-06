@@ -19,7 +19,6 @@ public class DMAPClientHandler implements IDMAPClientHandler {
     private static final String NO_ANSWER = "protocol error no answer";
     private static final String MALFORMED_ANSWER = "protocol error malformed answer";
     private static final String WRONG_ANSWER = "protocol error wrong answer while establishing connection";
-    private static final String NO_HASH = "tried to send hash but received blank";
 
     private final BufferedReader reader;
     private final PrintWriter writer;
