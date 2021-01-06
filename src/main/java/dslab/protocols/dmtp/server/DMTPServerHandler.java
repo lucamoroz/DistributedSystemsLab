@@ -31,7 +31,7 @@ public class DMTPServerHandler implements IDMTPServerHandler {
     @Override
     public void init() throws DMTPException, IOException {
         // Begin protocol
-        writer.println("ok DMTP");
+        writer.println("ok DMTP2.0");
         String message = reader.readLine();
 
         if (message != null && message.equals("begin")) {

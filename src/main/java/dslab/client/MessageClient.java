@@ -2,7 +2,8 @@ package dslab.client;
 
 import java.io.*;
 import java.net.Socket;
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -11,6 +12,7 @@ import at.ac.tuwien.dsg.orvell.StopShellException;
 import at.ac.tuwien.dsg.orvell.annotation.Command;
 import dslab.ComponentFactory;
 import dslab.protocols.dmap.DMAPException;
+import dslab.protocols.dmtp.DMTPException;
 import dslab.protocols.dmtp.Email;
 import dslab.protocols.dmtp.VerificationException;
 import dslab.util.Config;
@@ -21,11 +23,9 @@ import javax.crypto.spec.SecretKeySpec;
 public class MessageClient implements IMessageClient, Runnable {
     final private Config config;
     final private Shell shell;
-    private Socket dmtpSocket;
     private Socket dmapSocket;
-    private DMTPHandlerThread dmtpHandler;
+    private DMTPHandlerWrapper dmtpHandler;
     private DMAPHandlerWrapper dmapHandler;
-    private final BlockingQueue<Email> blockingQueue;
     private final String sender;
     private SecretKeySpec secretKeySpec;
 
@@ -44,8 +44,6 @@ public class MessageClient implements IMessageClient, Runnable {
         shell = new Shell(in, out);
         shell.register(this);
         shell.setPrompt(componentId + "> ");
-
-        blockingQueue = new ArrayBlockingQueue<>(40);
     }
 
     @Override
@@ -60,22 +58,8 @@ public class MessageClient implements IMessageClient, Runnable {
             return;
         }
 
-        // create socket for DMTP connection
-        try {
-            dmtpSocket = new Socket(config.getString("transfer.host"), config.getInt("transfer.port"));
-        } catch (IOException e) {
-            System.out.println("Error while creating client DMTP socket: " + e.getMessage());
-            shutdown();
-            return;
-        }
-
         // create handler wrapper for DMTP
-        dmtpHandler = new DMTPHandlerThread(dmtpSocket, blockingQueue);
-        if (!dmtpHandler.init()) {
-            shutdown();
-            return;
-        }
-        dmtpHandler.start();
+        dmtpHandler = new DMTPHandlerWrapper(config.getString("transfer.host"), config.getInt("transfer.port"));
 
         // create socket for DMAP connection
         try {
@@ -99,7 +83,7 @@ public class MessageClient implements IMessageClient, Runnable {
     @Override
     @Command
     public void inbox() {
-        dmapHandler.printInbox();
+        dmapHandler.printInbox(shell.out());
     }
 
     @Override
@@ -115,7 +99,7 @@ public class MessageClient implements IMessageClient, Runnable {
         try {
             parsedId = Integer.parseInt(id);
         } catch (NumberFormatException e) {
-            System.out.println("error given ID is not a valid integer");
+            shell.out().println("error given ID is not a valid integer");
             return;
         }
 
@@ -129,7 +113,7 @@ public class MessageClient implements IMessageClient, Runnable {
         try {
             parsedId = Integer.parseInt(id);
         } catch (NumberFormatException e) {
-            System.out.println("error given ID is not a valid integer");
+            shell.out().println("error given ID is not a valid integer");
             return;
         }
 
@@ -141,27 +125,34 @@ public class MessageClient implements IMessageClient, Runnable {
         try {
             email.verify(secretKeySpec);
         } catch (VerificationException e) {
-            System.out.println("error could not verify email: " + e.getMessage());
+            shell.out().printf("error could not verify email: %s%n", e.getMessage());
+            return;
         }
 
-        System.out.println("ok");
+        shell.out().println("ok");
     }
 
     @Override
     @Command
     public void msg(String to, String subject, String data) {
+        List<String> recipients = Arrays.asList(to.split(","));
         // validate address format
-        if (!Email.isValidAddress(to)) {
-            shell.out().printf("error given recipient '%s' is not a valid mail address%n", to);
-            return;
+        for (String recipient : recipients) {
+            if (!Email.isValidAddress(recipient)) {
+                shell.out().printf("error given recipient '%s' is not a valid mail address%n", recipient);
+                return;
+            }
         }
 
-        // create recipient list and email object
-        ArrayList<String> recipients = new ArrayList<>();
-        recipients.add(to);
         Email email = new Email(sender, recipients, subject, data);
+        try {
+            email.setHash(secretKeySpec);
+        } catch (VerificationException e) {
+            shell.out().printf("error could not calculate email hash%n");
+            return;
+        }
         // add to blocking queue for processing in sender thread
-        blockingQueue.add(email);
+        dmtpHandler.send(email, shell.out());
     }
 
     @Override
@@ -169,22 +160,7 @@ public class MessageClient implements IMessageClient, Runnable {
     public void shutdown() {
         // quit DMTP handler thread
         if (dmtpHandler != null) {
-            dmtpHandler.interrupt();
-            try {
-                // wait for thread to quit
-                dmtpHandler.join();
-            } catch (InterruptedException e) {
-                // noop
-            }
-        }
-
-        // close DMTP socket
-        if (dmtpSocket != null && !dmtpSocket.isClosed()) {
-            try {
-                dmtpSocket.close();
-            } catch (IOException e) {
-                shell.out().println("Error while closing DMTP socket: " + e.getMessage());
-            }
+            dmtpHandler.close();
         }
 
         // quit DMAP connection

@@ -62,6 +62,10 @@ public class Email {
                 "hash " + (hash == null ? "" : hash);
     }
 
+    public void setHash(SecretKeySpec secret) throws VerificationException {
+        hash = getHash(secret);
+    }
+
     public String getHash(SecretKeySpec secret) throws VerificationException {
         Mac mac;
         try {

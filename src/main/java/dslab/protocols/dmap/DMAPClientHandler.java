@@ -73,7 +73,7 @@ public class DMAPClientHandler implements IDMAPClientHandler {
                 throw new DMAPException(MALFORMED_ANSWER);
             }
 
-            String[] senderSubject = line.substring(2).split(" ");
+            String[] senderSubject = line.substring(2).split(" ", 2);
             if (senderSubject.length < 1) {
                 throw new DMAPException(MALFORMED_ANSWER);
             }
@@ -255,6 +255,9 @@ public class DMAPClientHandler implements IDMAPClientHandler {
         response.add(message);
         while (reader.ready() && (message = reader.readLine()) != null) {
             message = decrypt(message);
+            if (message.equals("ok")) {
+                break;
+            }
             response.add(message);
         }
 
