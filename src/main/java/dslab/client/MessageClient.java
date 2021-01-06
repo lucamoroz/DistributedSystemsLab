@@ -4,15 +4,12 @@ import java.io.*;
 import java.net.Socket;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 
 import at.ac.tuwien.dsg.orvell.Shell;
 import at.ac.tuwien.dsg.orvell.StopShellException;
 import at.ac.tuwien.dsg.orvell.annotation.Command;
 import dslab.ComponentFactory;
 import dslab.protocols.dmap.DMAPException;
-import dslab.protocols.dmtp.DMTPException;
 import dslab.protocols.dmtp.Email;
 import dslab.protocols.dmtp.VerificationException;
 import dslab.util.Config;
@@ -88,12 +85,6 @@ public class MessageClient implements IMessageClient, Runnable {
 
     @Override
     @Command
-    public void startsecure(){
-        dmapHandler.initSecure();
-    }
-
-    @Override
-    @Command
     public void delete(String id) {
         int parsedId;
         try {
@@ -103,7 +94,7 @@ public class MessageClient implements IMessageClient, Runnable {
             return;
         }
 
-        dmapHandler.delete(parsedId);
+        dmapHandler.delete(parsedId, shell.out());
     }
 
     @Override

@@ -95,12 +95,15 @@ public class DMAPHandlerWrapper {
         return email;
     }
 
-    public void delete(int id) {
+    public void delete(int id, PrintStream printStream) {
         try {
             handler.delete(id);
         } catch (IOException | DMAPException e) {
-            System.out.printf("error could not delete message with id %d: %s%n", id, e.getMessage());
+            printStream.printf("error could not delete message with id %d: %s%n", id, e.getMessage());
+            return;
         }
+
+        printStream.println("ok");
     }
 
     public void close() throws IOException, DMAPException {
