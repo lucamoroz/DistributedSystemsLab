@@ -158,8 +158,8 @@ public class DMAPServerHandler implements IDMAPServerHandler {
                             String header = entry.getKey().toString() + " " + entry.getValue().sender + " " + entry.getValue().subject;
                             sendMessage(header);
                         }
-                        sendMessage("ok");
                     }
+                    sendMessage("ok");
 
                     break;
                 case "show":
