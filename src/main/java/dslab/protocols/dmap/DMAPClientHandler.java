@@ -307,6 +307,12 @@ public class DMAPClientHandler implements IDMAPClientHandler {
         return decrypt(message);
     }
 
+    /**
+     * Encrypt a command with the cipher
+     * @param command Command to be encrypted
+     * @return The command as String encrypted with the cipher and encoded as Base 64
+     * @throws DMAPException Thrown if there is a issue with the encryption or the encoding
+     */
     private String encrypt(String command) throws DMAPException{
         if(isEncrypted){
             command = aesCipher.encryptString(command);
@@ -314,6 +320,12 @@ public class DMAPClientHandler implements IDMAPClientHandler {
         return command;
     }
 
+    /**
+     * Decrypt a command with the cipher
+     * @param command Command to be decrypted
+     * @return The command as String encrypted with the cipher and decoded from Base 64
+     * @throws DMAPException Thrown if there is a issue with the decryption or the decoding
+     */
     private String decrypt(String command) throws DMAPException{
         if(isEncrypted){
             command = aesCipher.decryptString(command);
