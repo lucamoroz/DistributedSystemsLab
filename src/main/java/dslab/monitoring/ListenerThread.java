@@ -33,7 +33,7 @@ public class ListenerThread extends Thread {
 
                 datagramSocket.receive(packet);
 
-                String message = new String(packet.getData());
+                String message = new String(packet.getData(), 0, packet.getLength());
 
                 LogMessage log = null;
                 try {

@@ -1,5 +1,10 @@
 package dslab.protocols.dmtp;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -16,10 +21,12 @@ public class Email {
         this.data = data;
     }
 
+    public int id;
     public String sender;
     public List<String> recipients;
     public String subject;
     public String data;
+    public String hash;
 
     public List<String> getRecipientsDomains() {
         return recipients.stream()
@@ -38,11 +45,58 @@ public class Email {
                 '}';
     }
 
+    public String prettyPrint() {
+        String prettyString = String.format("(%d) %s%n", id, subject);
+        prettyString += String.format("\tfrom:\t%s%n", sender);
+        prettyString += String.format("\tto:\t%s%n", String.join("; ", recipients));
+        prettyString += String.format("\tdata:\t%s", data);
+
+        return prettyString;
+    }
+
     public String printToDmtpFormat() {
         return "from " + sender + "\n" +
                 "to " + String.join(",", recipients) + "\n" +
                 "subject " + subject + "\n" +
-                "data " + data;
+                "data " + data + "\n" +
+                "hash " + (hash == null ? "" : hash);
+    }
+
+    public void setHash(SecretKeySpec secret) throws VerificationException {
+        hash = getHash(secret);
+    }
+
+    public String getHash(SecretKeySpec secret) throws VerificationException {
+        Mac mac;
+        try {
+            mac = Mac.getInstance("HmacSHA256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new VerificationException("SHA256 is not available as algorithm");
+        }
+
+        try {
+            mac.init(secret);
+        } catch (InvalidKeyException e) {
+            throw new VerificationException("Invalid key: " + e.getMessage());
+        }
+
+        String msg = String.join("\n", sender, String.join(",", recipients), subject, data);
+        byte[] hashBytes = mac.doFinal(msg.getBytes());
+
+        return Base64.getEncoder().encodeToString(hashBytes);
+    }
+
+    public void verify(SecretKeySpec secret) throws VerificationException {
+        if (hash == null || hash.isBlank()) {
+            System.out.println("No hash available for message");
+            return;
+        }
+
+        String calculatedHash = getHash(secret);
+
+        if (!calculatedHash.equals(hash)) {
+            throw new VerificationException("message hash does not match");
+        }
     }
 
     /**

@@ -31,7 +31,7 @@ public class DMTPServerHandler implements IDMTPServerHandler {
     @Override
     public void init() throws DMTPException, IOException {
         // Begin protocol
-        writer.println("ok DMTP");
+        writer.println("ok DMTP2.0");
         String message = reader.readLine();
 
         if (message != null && message.equals("begin")) {
@@ -119,6 +119,10 @@ public class DMTPServerHandler implements IDMTPServerHandler {
                     writer.println("ok");
                     break;
 
+                case "hash":
+                    email.hash = request.substring(5);
+                    writer.println("ok");
+                    break;
                 case "send":
 
                     if (!request.equals("send")) {

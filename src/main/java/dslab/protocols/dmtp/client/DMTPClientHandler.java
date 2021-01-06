@@ -34,7 +34,7 @@ public class DMTPClientHandler implements IDMTPClientHandler {
         message = reader.readLine();
         if (message == null)
             throw new DMTPException(NO_ANSWER);
-        if (!message.equals("ok DMTP"))
+        if (!message.equals("ok DMTP2.0"))
             throw new DMTPException(UNEXPECTED_ANSWER);
 
         command = "begin";
@@ -68,6 +68,9 @@ public class DMTPClientHandler implements IDMTPClientHandler {
         executeOrThrowException(command, "ok", reader, writer);
 
         command = "data " + email.data;
+        executeOrThrowException(command, "ok", reader, writer);
+
+        command = "hash " + email.hash;
         executeOrThrowException(command, "ok", reader, writer);
 
         command = "send";

@@ -19,10 +19,13 @@ public class DMAPListenerThread extends Thread {
     private final Config userConfig;
     private final String domain;
 
+    private String componentId;
+
     ExecutorService executorService;
 
-    public DMAPListenerThread(Config config, ServerSocket serverSocket) {
+    public DMAPListenerThread(Config config, ServerSocket serverSocket, String componentId) {
         this.config = config;
+        this.componentId = componentId;
         this.serverSocket = serverSocket;
 
         this.userConfig = new Config(config.getString("users.config"));
@@ -39,7 +42,7 @@ public class DMAPListenerThread extends Thread {
 
             try {
                 socket = serverSocket.accept();
-                Runnable clientHandler = new ClientHandler(userConfig, socket);
+                Runnable clientHandler = new ClientHandler(userConfig, socket, componentId);
                 executorService.submit(clientHandler);
 
             } catch (SocketException e) {

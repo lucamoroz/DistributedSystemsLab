@@ -1,11 +1,19 @@
 package dslab.protocols.dmap;
 
 import dslab.protocols.dmtp.Email;
+import dslab.util.CipherDMAP;
+import dslab.util.Keys;
+import dslab.util.SecurityHelper;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.security.PrivateKey;
 import java.util.List;
 import java.util.Map;
 
@@ -14,29 +22,100 @@ public class DMAPServerHandler implements IDMAPServerHandler {
     private final Socket socket;
     private final BufferedReader reader;
     private final PrintWriter writer;
+    private boolean isEncrypted = false;
+    private CipherDMAP cipher;
     private String loggedUser = null;
+    private final String componentId;
 
-    public DMAPServerHandler(Socket socket, BufferedReader reader, PrintWriter writer) {
+    public DMAPServerHandler(Socket socket, BufferedReader reader, PrintWriter writer, String componentId) {
         this.socket = socket;
         this.reader = reader;
         this.writer = writer;
+        this.componentId = componentId;
+    }
+
+    private void initSecureCommunication() throws IOException, DMAPException {
+        String request = "";
+
+        // Get private key for the server and create a new cipher based on it
+        PrivateKey key = SecurityHelper.getPrivateKey(componentId);
+        cipher = new CipherDMAP("RSA/ECB/PKCS1Padding", key);
+
+        while ((request = reader.readLine())!= null) {
+            request = new String(cipher.decrypt(
+                    SecurityHelper.decodeBase64(request)
+            ));
+
+            String[] tokens = request.split(" ");
+
+            // Check if the message matches: ok <challenge> <sk> <iv>
+            if (tokens.length == 4) {
+                if(!tokens[0].equals("ok")) throw new DMAPException("error protocol error");
+
+                // Decode the secret and iv from base64
+                byte[] secret = SecurityHelper.decodeBase64(tokens[2]);
+                byte[] iv = SecurityHelper.decodeBase64(tokens[3]);
+                cipher = new CipherDMAP(secret, iv,"AES/CTR/NoPadding");
+
+                // Build response with the challenge
+                String answer = "ok " + tokens[1];
+                answer = SecurityHelper.enocdeToBase64(
+                        cipher.encrypt(answer.getBytes())
+                );
+                writer.println(answer);
+                isEncrypted = true;
+            }else if(tokens.length == 1 && tokens[0].equals("ok") && isEncrypted){
+                break;
+            }else{
+                throw new DMAPException("error protocol");
+            }
+        }
+    }
+
+    /**
+     * Sends a message to the client. The message is encrypted if a secure connection has already been successfully established
+     * @param msg Message which is going to be sent to the server
+     * @throws DMAPException Thorwn if there is a problem with the encryption or the sending of the message
+     */
+    private void sendMessage(String msg) throws DMAPException{
+        if (isEncrypted) {
+            writer.println(cipher.encryptString(msg));
+        } else {
+            writer.println(msg);
+        }
     }
 
     @Override
     public void handleClient(Callback callback) throws IOException, DMAPException {
 
-        writer.println("ok DMAP");
+        writer.println("ok DMAP2.0");
         String request;
 
         while ((request = reader.readLine())!= null) {
 
+
+            if(isEncrypted) {
+                request = new String(cipher.decrypt(
+                        SecurityHelper.decodeBase64(request)
+                ));
+            }
+
             String[] tokens = request.split(" ");
 
             switch (tokens[0]) {
+                case "startsecure":
+                    if(isEncrypted) {
+                        // check if there is already a secure communication
+                        sendMessage("A secure communication has already been started!");
+                        break;
+                    }
+                    writer.println("ok " + componentId);
+                    initSecureCommunication();
+                    break;
                 case "login":
 
                     if (this.loggedUser != null) {
-                        writer.println("error already logged in");
+                        sendMessage("error already logged in");
                         break;
                     }
                     if (tokens.length == 3) {
@@ -44,104 +123,106 @@ public class DMAPServerHandler implements IDMAPServerHandler {
                         String password = tokens[2];
 
                         if (!callback.userExists(user)) {
-                            writer.println("error unknown user");
+                            sendMessage("error unknown user");
                             break;
                         }
                         if (!callback.isLoginValid(user, password)) {
-                            writer.println("error wrong password");
+                            sendMessage("error wrong password");
                             break;
                         } else {
                             this.loggedUser = user;
-                            writer.println("ok");
+                            sendMessage("ok");
                         }
 
                     } else {
-                        writer.println("error protocol error");
+                        sendMessage("error protocol error");
                         throw new DMAPException("protocol error");
                     }
                     break;
                 case "list":
 
                     if (!request.equals("list")) {
-                        writer.println("error protocol error");
+                        sendMessage("error protocol error");
                         throw new DMAPException("error protocol error");
                     }
                     if (this.loggedUser == null) {
-                        writer.println("error not logged in");
+                        sendMessage("error not logged in");
                         break;
                     }
 
                     List<Map.Entry<Integer, Email>> userEmails = callback.listUserEmails(this.loggedUser);
                     if (userEmails.isEmpty()) {
-                        writer.println("no emails :(");
+                        sendMessage("no emails :(");
                     }else {
                         for (Map.Entry<Integer, Email> entry : userEmails) {
                             String header = entry.getKey().toString() + " " + entry.getValue().sender + " " + entry.getValue().subject;
-                            writer.println(header);
+                            sendMessage(header);
                         }
                     }
+                    sendMessage("ok");
 
                     break;
                 case "show":
 
                     if (tokens.length != 2) {
-                        writer.println("error protocol error");
+                        sendMessage("error protocol error");
                         throw new DMAPException("error protocol error");
                     }
                     if (this.loggedUser == null) {
-                        writer.println("error not logged in");
+                        sendMessage("error not logged in");
                         break;
                     }
 
                     Email email = callback.getEmail(this.loggedUser, Integer.parseInt(tokens[1]));
                     if (email != null) {
-                        writer.println(email.printToDmtpFormat());
+                        sendMessage(email.printToDmtpFormat());
+                        sendMessage("ok");
                     } else {
-                        writer.println("error unknown message id");
+                        sendMessage("error unknown message id");
                     }
 
                     break;
                 case "delete":
 
                     if (tokens.length != 2) {
-                        writer.println("error protocol error");
+                        sendMessage("error protocol error");
                         throw new DMAPException("error protocol error");
                     }
                     if (this.loggedUser == null) {
-                        writer.println("error not logged in");
+                        sendMessage("error not logged in");
                         break;
                     }
 
                     if (callback.deleteEmail(this.loggedUser, Integer.parseInt(tokens[1]))) {
-                        writer.println("ok");
+                        sendMessage("ok");
                     } else {
-                        writer.println("error unknown message id");
+                        sendMessage("error unknown message id");
                     }
 
                     break;
                 case "logout":
 
                     if (!request.equals("logout")) {
-                        writer.println("error protocol error");
+                        sendMessage("error protocol error");
                         throw new DMAPException("error protocol error");
                     }
                     if (this.loggedUser == null) {
-                        writer.println("error not logged in");
+                        sendMessage("error not logged in");
                         break;
                     }
 
                     this.loggedUser = null;
-                    writer.println("ok");
+                    sendMessage("ok");
 
                     break;
                 case "quit":
-
-                    writer.println("ok bye");
+                    sendMessage("ok bye");
+                    this.isEncrypted = false;
                     this.loggedUser = null;
                     return;
 
                 default:
-                    writer.println("error protocol error");
+                    sendMessage("error protocol error");
                     throw new DMAPException("protocol error");
             }
         }
