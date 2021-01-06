@@ -62,8 +62,8 @@ public class DMAPHandlerWrapper {
             try {
                 email = handler.show(id);
             } catch (IOException | DMAPException e) {
-                printStream.println("error receiving email list: " + e.getMessage());
-                return;
+                printStream.println("error receiving email: " + e.getMessage());
+                continue;
             }
 
             emails.add(email);

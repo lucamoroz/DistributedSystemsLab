@@ -70,12 +70,14 @@ public class DMAPClientHandler implements IDMAPClientHandler {
             try {
                 id = Integer.parseInt(line.substring(0, 1));
             } catch (NumberFormatException e) {
-                throw new DMAPException(MALFORMED_ANSWER);
+                System.out.println("could not parse email ID. skipping entry");
+                continue;
             }
 
             String[] senderSubject = line.substring(2).split(" ", 2);
             if (senderSubject.length < 1) {
-                throw new DMAPException(MALFORMED_ANSWER);
+                System.out.println("could not parse sender and subject. skipping entry");
+                continue;
             }
 
             emails.put(id, senderSubject);
@@ -159,7 +161,7 @@ public class DMAPClientHandler implements IDMAPClientHandler {
                         }
 
                         if (dataSplit[1].isBlank()) {
-                            throw new DMAPException(NO_HASH);
+                            continue;
                         }
 
                         email.hash = dataSplit[1];
